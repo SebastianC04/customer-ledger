@@ -1,0 +1,7 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+pydantic
+pywebview
+pythonnet; sys_platform == "win32"
+pyinstaller

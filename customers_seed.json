@@ -1,0 +1,5 @@
+[
+  {"name": "Maria Example", "phone_number": "(555) 010-0101", "address": "100 Sample St, Springfield", "date_created": "01/05/2026"},
+  {"name": "John Sample", "phone_number": "(555) 010-0102", "address": "200 Demo Ave, Springfield", "date_created": "01/12/2026"},
+  {"name": "Ana Demo", "phone_number": "(555) 010-0103", "address": "300 Test Blvd, Springfield", "date_created": "02/02/2026"}
+]

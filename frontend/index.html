@@ -1,0 +1,1087 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TARJETAS</title>
+<style>
+  :root {
+    --ink: #2b2b28;
+    --paper: #fdfcf8;
+    --paper-line: #d8d3c4;
+    --accent: #6b5b3f;
+    --accent-light: #ece6d6;
+    --danger: #a3402f;
+    --green: #3f6b4a;
+  }
+  * { box-sizing: border-box; }
+  body, button, input, select, textarea, dialog {
+    font-family: 'Georgia', 'Times New Roman', serif;
+  }
+  body {
+    margin: 0;
+    background: #eae6db;
+    color: var(--ink);
+    font-variant-numeric: lining-nums tabular-nums;
+  }
+  header {
+    background: var(--accent);
+    color: #fff;
+    padding: 18px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  header h1 {
+    margin: 0;
+    font-size: 1.4rem;
+    letter-spacing: 0.5px;
+  }
+  .top-controls {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .search-bar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .search-bar input {
+    padding: 8px 10px;
+    border-radius: 4px;
+    border: none;
+    min-width: 200px;
+  }
+  button, select {
+    cursor: pointer;
+    border: 1px solid var(--accent);
+    background: var(--accent);
+    color: #fff;
+    padding: 8px 14px;
+    border-radius: 4px;
+    font-size: 0.9rem;
+  }
+  select { cursor: pointer; }
+  button.secondary, select.secondary {
+    background: #fff;
+    color: var(--accent);
+  }
+  button.danger {
+    background: var(--danger);
+    border-color: var(--danger);
+  }
+  button:hover { opacity: 0.9; }
+
+  main {
+    max-width: 1150px;
+    margin: 24px auto;
+    padding: 0 20px 60px;
+  }
+
+  #customerList {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .customer-tile {
+    background: var(--paper);
+    border: 1px solid var(--paper-line);
+    border-radius: 6px;
+    padding: 14px;
+    cursor: pointer;
+    transition: box-shadow 0.15s;
+  }
+  .customer-tile:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+  .customer-tile .name { font-weight: bold; font-size: 1.05rem; }
+  .customer-tile .phone { color: #6a6a63; font-size: 0.9rem; margin-top: 4px; }
+
+  .card {
+    background: var(--paper);
+    border: 1px solid var(--paper-line);
+    border-radius: 8px;
+    padding: 28px 32px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+  }
+  .card-header {
+    text-align: center;
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 16px;
+    margin-bottom: 16px;
+    position: relative;
+  }
+  .card-header .field-name {
+    font-size: 1.6rem;
+    font-weight: bold;
+  }
+  .card-header .sub-fields {
+    margin-top: 10px;
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    flex-wrap: wrap;
+    font-size: 0.95rem;
+    color: #4a4a45;
+  }
+  .card-lang-toggle {
+    position: absolute;
+    top: 0;
+    right: 0;
+    font-size: 0.75rem;
+    padding: 4px 8px;
+  }
+  .editable {
+    border-bottom: 1px dashed transparent;
+    padding: 2px 4px;
+    border-radius: 3px;
+  }
+  .editable:hover {
+    border-bottom: 1px dashed var(--accent);
+    background: var(--accent-light);
+  }
+  .editable[contenteditable="true"] {
+    background: #fff9e6;
+    border-bottom: 1px solid var(--accent);
+    outline: none;
+  }
+  .readonly-balance { color: #555; }
+
+  table.ledger {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+    font-size: 0.92rem;
+  }
+  table.ledger th, table.ledger td {
+    border: 1px solid var(--paper-line);
+    padding: 6px 8px;
+    text-align: left;
+  }
+  table.ledger th {
+    background: var(--accent-light);
+    font-weight: bold;
+  }
+  table.ledger td.num { text-align: right; }
+  table.ledger tr:nth-child(even) { background: #faf8f2; }
+  .deposit-cell { color: var(--green); }
+  .withdrawal-cell { color: var(--danger); }
+  .entry-actions button { padding: 3px 8px; font-size: 0.78rem; margin-right: 4px; }
+
+  .card-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 14px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .toolbar-left { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .pagination {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.9rem;
+  }
+
+  dialog {
+    border: none;
+    border-radius: 8px;
+    padding: 0;
+    max-width: 420px;
+    width: 90%;
+  }
+  dialog.dialog-wide { max-width: 640px; }
+  dialog::backdrop { background: rgba(0,0,0,0.4); }
+  .dialog-inner { padding: 20px 24px; }
+  .dialog-inner h2 { margin-top: 0; font-size: 1.15rem; }
+  .form-row { margin-bottom: 12px; display: flex; flex-direction: column; gap: 4px; }
+  .form-row label { font-size: 0.85rem; color: #555; }
+  .form-row input, .form-row select {
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background: #fff;
+    color: var(--ink);
+  }
+  .dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 16px;
+  }
+  .hidden { display: none !important; }
+  .empty-state {
+    text-align: center;
+    color: #888;
+    padding: 40px 0;
+  }
+  #backBtn { margin-bottom: 14px; }
+
+  .backup-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--paper-line);
+    border-radius: 5px;
+    margin-bottom: 8px;
+    background: var(--paper);
+  }
+  .backup-row .backup-info { font-size: 0.85rem; }
+  .backup-row .backup-info .when { font-weight: bold; }
+  .backup-row .backup-info .size { color: #888; }
+  .backup-row .backup-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .backup-row .backup-actions button { padding: 5px 10px; font-size: 0.8rem; }
+
+  .history-presets { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0 14px; }
+  .history-presets button { padding: 6px 10px; font-size: 0.82rem; }
+  .history-totals {
+    display: flex; gap: 18px; flex-wrap: wrap;
+    background: var(--accent-light); border-radius: 6px;
+    padding: 10px 14px; margin-bottom: 14px; font-size: 0.9rem;
+  }
+  .history-totals .stat b { display: block; font-size: 1.05rem; }
+  table.history-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  table.history-table th, table.history-table td {
+    border: 1px solid var(--paper-line); padding: 5px 7px; text-align: left;
+  }
+  table.history-table th { background: var(--accent-light); }
+  #historyResults { max-height: 340px; overflow-y: auto; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1 data-i18n="app_title">TARJETAS</h1>
+  <div class="top-controls">
+    <div class="search-bar">
+      <input id="searchInput" type="text" data-i18n-placeholder="search_placeholder" placeholder="Search by name or phone number...">
+      <button class="secondary" id="searchBtn" data-i18n="search">Search</button>
+      <button class="secondary" id="clearSearchBtn" data-i18n="clear">Clear</button>
+    </div>
+    <button id="newCustomerBtn" data-i18n="new_customer">+ New Customer</button>
+    <button class="secondary" id="historyBtn" data-i18n="history">History</button>
+    <button class="secondary" id="backupNowBtn" data-i18n="backup_now">Backup Now</button>
+    <button class="secondary" id="manageBackupsBtn" data-i18n="manage_backups">Manage Backups</button>
+    <button class="secondary" id="langToggleBtn">ES</button>
+  </div>
+</header>
+
+<main>
+  <div id="listView">
+    <div id="customerList"></div>
+    <div id="listEmptyState" class="empty-state hidden" data-i18n="no_customers">No customers yet. Click "+ New Customer" to create one.</div>
+  </div>
+
+  <div id="cardView" class="hidden">
+    <button class="secondary" id="backBtn" data-i18n="back">&larr; Back to all customers</button>
+    <div class="card">
+      <div class="card-header">
+        <select id="cardLangSelect" class="card-lang-toggle secondary">
+          <option value="">App default</option>
+          <option value="en">English</option>
+          <option value="es">Español</option>
+        </select>
+        <div class="field-name editable" id="fld-name" contenteditable="false" data-field="name"></div>
+        <div class="sub-fields">
+          <span><span data-i18n="phone_label">Phone</span>: <span class="editable" id="fld-phone" contenteditable="false" data-field="phone_number"></span></span>
+          <span><span data-i18n="address_label">Address</span>: <span class="editable" id="fld-address" contenteditable="false" data-field="address"></span></span>
+          <span><span data-i18n="date_created_label">Date created</span>: <span class="editable" id="fld-date_created" contenteditable="false" data-field="date_created"></span></span>
+        </div>
+      </div>
+
+      <div class="card-toolbar">
+        <div class="toolbar-left">
+          <button id="addEntryBtn" data-i18n="add_item">+ Add Item</button>
+          <select id="sortSelect" class="secondary">
+            <option value="added" data-i18n="sort_added">Order Added</option>
+            <option value="recent" data-i18n="sort_recent">Recently Added First</option>
+            <option value="deposit" data-i18n="sort_deposit">Deposit Amount</option>
+            <option value="balance" data-i18n="sort_balance">Total Balance</option>
+          </select>
+        </div>
+        <div class="pagination">
+          <button class="secondary" id="prevPageBtn">&laquo; <span data-i18n="prev">Prev</span></button>
+          <span id="pageLabel">Page 1 of 1</span>
+          <button class="secondary" id="nextPageBtn"><span data-i18n="next">Next</span> &raquo;</button>
+        </div>
+      </div>
+
+      <table class="ledger">
+        <thead>
+          <tr>
+            <th data-i18n="date">Date</th>
+            <th data-i18n="time_col">Time</th>
+            <th data-i18n="item_description">Item Description</th>
+            <th class="num" data-i18n="deposit">Deposit</th>
+            <th class="num" data-i18n="withdrawal">Withdrawal</th>
+            <th class="num" data-i18n="total_balance">Total Balance</th>
+            <th data-i18n="actions">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="entryRows"></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<!-- New customer dialog -->
+<dialog id="newCustomerDialog">
+  <div class="dialog-inner">
+    <h2 data-i18n="new_customer_title">New Customer Card</h2>
+    <div class="form-row">
+      <label data-i18n="customer_name_label">Customer name</label>
+      <input id="nc-name" type="text">
+    </div>
+    <div class="form-row">
+      <label data-i18n="phone_label">Phone number</label>
+      <input id="nc-phone" type="text">
+    </div>
+    <div class="form-row">
+      <label data-i18n="address_label">Address</label>
+      <input id="nc-address" type="text">
+    </div>
+    <div class="form-row">
+      <label data-i18n="date_created_label">Date created</label>
+      <input id="nc-date" type="date">
+    </div>
+    <div class="dialog-actions">
+      <button class="secondary" id="nc-cancel" data-i18n="cancel">Cancel</button>
+      <button id="nc-save" data-i18n="create_card">Create Card</button>
+    </div>
+  </div>
+</dialog>
+
+<!-- New entry dialog -->
+<dialog id="newEntryDialog">
+  <div class="dialog-inner">
+    <h2 data-i18n="add_item_title">Add Item</h2>
+    <div class="form-row">
+      <label data-i18n="date">Date</label>
+      <input id="ne-date" type="date">
+    </div>
+    <div class="form-row">
+      <label data-i18n="item_description">Item description</label>
+      <select id="ne-desc-select"></select>
+      <input id="ne-desc-custom" type="text" class="hidden" data-i18n-placeholder="custom_description" placeholder="Type description...">
+    </div>
+    <div class="form-row">
+      <label data-i18n="deposit">Deposit</label>
+      <input id="ne-deposit" type="number" step="0.01" placeholder="0.00">
+    </div>
+    <div class="form-row">
+      <label data-i18n="withdrawal">Withdrawal</label>
+      <input id="ne-withdrawal" type="number" step="0.01" placeholder="0.00">
+    </div>
+    <p style="font-size:0.8rem; color:#777; margin-top:-6px;" data-i18n="balance_auto_note">Total balance is calculated automatically from deposits and withdrawals.</p>
+    <div class="dialog-actions">
+      <button class="secondary" id="ne-cancel" data-i18n="cancel">Cancel</button>
+      <button id="ne-save" data-i18n="add_item">Add Item</button>
+    </div>
+  </div>
+</dialog>
+
+<!-- Manage backups dialog -->
+<dialog id="backupsDialog" class="dialog-wide">
+  <div class="dialog-inner">
+    <h2 data-i18n="manage_backups_title">Manage Backups</h2>
+    <p style="font-size:0.85rem; color:#666; margin-top:-8px;" data-i18n="backups_explainer">
+      A backup is taken automatically on launch and every 30 minutes. Restoring
+      overwrites your current data with the chosen backup — a safety backup of
+      what you had is taken first, so restoring is itself reversible.
+    </p>
+    <div id="backupsList" style="max-height:320px; overflow-y:auto; margin:14px 0;"></div>
+    <div id="backupsEmptyState" class="empty-state hidden" style="padding:20px 0;" data-i18n="no_backups">No backups yet.</div>
+    <div class="dialog-actions">
+      <button class="secondary" id="backups-close" data-i18n="close">Close</button>
+    </div>
+  </div>
+</dialog>
+
+<!-- History dialog -->
+<dialog id="historyDialog" class="dialog-wide">
+  <div class="dialog-inner">
+    <h2 data-i18n="history_title">History of Activity</h2>
+    <div class="history-presets">
+      <button class="secondary" id="hist-today" data-i18n="preset_today">Today</button>
+      <button class="secondary" id="hist-week" data-i18n="preset_week">1 Week</button>
+      <button class="secondary" id="hist-month" data-i18n="preset_month">1 Month</button>
+      <button class="secondary" id="hist-year" data-i18n="preset_year">1 Year</button>
+    </div>
+    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px;">
+      <div class="form-row" style="flex:1; min-width:130px;">
+        <label data-i18n="from_label">From</label>
+        <input id="hist-start" type="date">
+      </div>
+      <div class="form-row" style="flex:1; min-width:130px;">
+        <label data-i18n="to_label">To</label>
+        <input id="hist-end" type="date">
+      </div>
+      <div class="form-row" style="flex:1; min-width:160px;">
+        <label data-i18n="customer_filter_label">Customer</label>
+        <select id="hist-customer">
+          <option value="" data-i18n="all_customers">All Customers</option>
+        </select>
+      </div>
+    </div>
+    <button id="hist-run" data-i18n="run_search">Show Activity</button>
+
+    <div id="historyTotals" class="history-totals hidden">
+      <div class="stat"><span data-i18n="total_deposited">Total Deposited</span><b id="hist-total-deposit">$0.00</b></div>
+      <div class="stat"><span data-i18n="total_withdrawn">Total Withdrawn</span><b id="hist-total-withdrawal">$0.00</b></div>
+      <div class="stat"><span data-i18n="net">Net</span><b id="hist-total-net">$0.00</b></div>
+      <div class="stat"><span data-i18n="entry_count">Entries</span><b id="hist-count">0</b></div>
+    </div>
+    <div id="historyResults"></div>
+    <div id="historyEmptyState" class="empty-state hidden" data-i18n="no_activity">No activity in this range.</div>
+
+    <div class="dialog-actions">
+      <button class="secondary" id="history-close" data-i18n="close">Close</button>
+    </div>
+  </div>
+</dialog>
+
+<script>
+const API = "/api";
+let currentCustomerId = null;
+let currentPage = 1;
+let currentSort = "added";
+
+// ===================== i18n =====================
+const TRANSLATIONS = {
+  en: {
+    app_title: "TARJETAS", search: "Search", clear: "Clear",
+    search_placeholder: "Search by name or phone number...",
+    new_customer: "+ New Customer", history: "History",
+    backup_now: "Backup Now", manage_backups: "Manage Backups",
+    no_customers: 'No customers yet. Click "+ New Customer" to create one.',
+    back: "\u2190 Back to all customers",
+    phone_label: "Phone", address_label: "Address", date_created_label: "Date created",
+    add_item: "+ Add Item", prev: "Prev", next: "Next",
+    date: "Date", item_description: "Item Description", deposit: "Deposit",
+    withdrawal: "Withdrawal", total_balance: "Total Balance", actions: "Actions",
+    time_col: "Time",
+    sort_added: "Order Added", sort_recent: "Recently Added First",
+    sort_deposit: "Deposit Amount", sort_balance: "Total Balance",
+    new_customer_title: "New Customer Card", customer_name_label: "Customer name",
+    cancel: "Cancel", create_card: "Create Card",
+    add_item_title: "Add Item", other_option: "Other (type manually)",
+    custom_description: "Type description...",
+    balance_auto_note: "Total balance is calculated automatically from deposits and withdrawals.",
+    manage_backups_title: "Manage Backups",
+    backups_explainer: "A backup is taken automatically on launch and every 30 minutes. Restoring overwrites your current data with the chosen backup \u2014 a safety backup of what you had is taken first, so restoring is itself reversible.",
+    no_backups: "No backups yet.", close: "Close",
+    history_title: "History of Activity", preset_today: "Today", preset_week: "1 Week",
+    preset_month: "1 Month", preset_year: "1 Year", from_label: "From", to_label: "To",
+    customer_filter_label: "Customer", all_customers: "All Customers", run_search: "Show Activity",
+    total_deposited: "Total Deposited", total_withdrawn: "Total Withdrawn", net: "Net",
+    entry_count: "Entries", no_activity: "No activity in this range.",
+    edit: "Edit", save: "Save", delete: "Delete", restore: "Restore",
+  },
+  es: {
+    app_title: "TARJETAS", search: "Buscar", clear: "Limpiar",
+    search_placeholder: "Buscar por nombre o teléfono...",
+    new_customer: "+ Nuevo Cliente", history: "Historial",
+    backup_now: "Respaldar Ahora", manage_backups: "Administrar Respaldos",
+    no_customers: 'Aún no hay clientes. Haga clic en "+ Nuevo Cliente" para crear uno.',
+    back: "\u2190 Volver a todos los clientes",
+    phone_label: "Teléfono", address_label: "Dirección", date_created_label: "Fecha de creación",
+    add_item: "+ Agregar Artículo", prev: "Anterior", next: "Siguiente",
+    date: "Fecha", item_description: "Descripción del Artículo", deposit: "Abono",
+    withdrawal: "Retiro", total_balance: "Saldo", actions: "Acciones",
+    time_col: "Hora",
+    sort_added: "Orden Agregado", sort_recent: "Más Recientes Primero",
+    sort_deposit: "Monto de Abono", sort_balance: "Saldo Total",
+    new_customer_title: "Nueva Tarjeta de Cliente", customer_name_label: "Nombre del cliente",
+    cancel: "Cancelar", create_card: "Crear Tarjeta",
+    add_item_title: "Agregar Artículo", other_option: "Otro (escribir manualmente)",
+    custom_description: "Escriba la descripción...",
+    balance_auto_note: "El saldo total se calcula automáticamente según los abonos y retiros.",
+    manage_backups_title: "Administrar Respaldos",
+    backups_explainer: "Se hace un respaldo automáticamente al abrir la app y cada 30 minutos. Restaurar reemplaza los datos actuales con el respaldo elegido \u2014 primero se guarda un respaldo de seguridad, así que restaurar también se puede deshacer.",
+    no_backups: "Aún no hay respaldos.", close: "Cerrar",
+    history_title: "Historial de Actividad", preset_today: "Hoy", preset_week: "1 Semana",
+    preset_month: "1 Mes", preset_year: "1 Año", from_label: "Desde", to_label: "Hasta",
+    customer_filter_label: "Cliente", all_customers: "Todos los Clientes", run_search: "Mostrar Actividad",
+    total_deposited: "Total Abonado", total_withdrawn: "Total Retirado", net: "Neto",
+    entry_count: "Entradas", no_activity: "No hay actividad en este rango.",
+    edit: "Editar", save: "Guardar", delete: "Eliminar", restore: "Restaurar",
+  }
+};
+
+function getGlobalLanguage() {
+  return localStorage.getItem("tarjetas_language") || "en";
+}
+function setGlobalLanguage(lang) {
+  localStorage.setItem("tarjetas_language", lang);
+}
+// Effective language for whatever's currently on screen: a customer's own
+// override (when a card is open and has one) wins over the global default.
+let activeCustomerLanguageOverride = null;
+function getActiveLanguage() {
+  return activeCustomerLanguageOverride || getGlobalLanguage();
+}
+function t(key) {
+  const lang = getActiveLanguage();
+  return (TRANSLATIONS[lang] && TRANSLATIONS[lang][key]) || TRANSLATIONS.en[key] || key;
+}
+function applyTranslations() {
+  document.querySelectorAll("[data-i18n]").forEach(el => {
+    el.textContent = t(el.dataset.i18n);
+  });
+  document.querySelectorAll("[data-i18n-placeholder]").forEach(el => {
+    el.placeholder = t(el.dataset.i18nPlaceholder);
+  });
+  document.getElementById("langToggleBtn").textContent = getGlobalLanguage() === "en" ? "ES" : "EN";
+  document.title = t("app_title");
+}
+
+document.getElementById("langToggleBtn").onclick = () => {
+  setGlobalLanguage(getGlobalLanguage() === "en" ? "es" : "en");
+  applyTranslations();
+};
+
+// ===================== Utility =====================
+function fmtMoney(v) {
+  if (v === null || v === undefined || v === "") return "0.00";
+  return Number(v).toFixed(2);
+}
+
+async function api(path, options = {}) {
+  const res = await fetch(API + path, {
+    headers: { "Content-Type": "application/json" },
+    ...options,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    alert("Error: " + (err.detail || res.statusText));
+    throw new Error(err.detail || res.statusText);
+  }
+  if (res.status === 204) return null;
+  return res.json();
+}
+
+function escapeHtml(s) {
+  if (s === null || s === undefined) return "";
+  return String(s).replace(/[&<>"']/g, (m) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[m]));
+}
+
+// Live-formats a phone input's value into (xxx)-xxx-xxxx as the user types.
+function formatPhoneInput(inputEl) {
+  inputEl.addEventListener("input", () => {
+    let digits = inputEl.value.replace(/\D/g, "").slice(0, 10);
+    let formatted = digits;
+    if (digits.length > 6) {
+      formatted = `(${digits.slice(0,3)})-${digits.slice(3,6)}-${digits.slice(6,10)}`;
+    } else if (digits.length > 3) {
+      formatted = `(${digits.slice(0,3)})-${digits.slice(3,6)}`;
+    } else if (digits.length > 0) {
+      formatted = `(${digits}`;
+    }
+    inputEl.value = formatted;
+  });
+}
+formatPhoneInput(document.getElementById("nc-phone"));
+
+// ===================== List view =====================
+async function loadCustomerList(q = "") {
+  const params = q ? `?q=${encodeURIComponent(q)}` : "";
+  const customers = await api(`/customers${params}`);
+  const list = document.getElementById("customerList");
+  const empty = document.getElementById("listEmptyState");
+  list.innerHTML = "";
+  if (customers.length === 0) {
+    empty.classList.remove("hidden");
+  } else {
+    empty.classList.add("hidden");
+    for (const c of customers) {
+      const tile = document.createElement("div");
+      tile.className = "customer-tile";
+      tile.innerHTML = `<div class="name">${escapeHtml(c.name)}</div><div class="phone">${escapeHtml(c.phone_number)}</div>`;
+      tile.onclick = () => openCard(c.id);
+      list.appendChild(tile);
+    }
+  }
+  return customers;
+}
+
+document.getElementById("clearSearchBtn").onclick = () => {
+  document.getElementById("searchInput").value = "";
+  loadCustomerList();
+};
+
+// ===================== Card view =====================
+async function openCard(customerId, page = 1, sort = null) {
+  currentCustomerId = customerId;
+  currentPage = page;
+  if (sort) currentSort = sort;
+  const data = await api(`/customers/${customerId}?page=${page}&sort=${currentSort}`);
+
+  activeCustomerLanguageOverride = data.language || null;
+  document.getElementById("cardLangSelect").value = data.language || "";
+
+  document.getElementById("listView").classList.add("hidden");
+  document.getElementById("cardView").classList.remove("hidden");
+
+  document.getElementById("fld-name").textContent = data.name;
+  document.getElementById("fld-phone").textContent = data.phone_number;
+  document.getElementById("fld-address").textContent = data.address || "";
+  document.getElementById("fld-date_created").textContent = data.date_created;
+
+  document.getElementById("pageLabel").textContent =
+    `Page ${data.page} of ${data.total_pages} (${data.total_entries} items)`;
+  document.getElementById("sortSelect").value = currentSort;
+
+  const tbody = document.getElementById("entryRows");
+  tbody.innerHTML = "";
+  for (const e of data.entries) {
+    tbody.appendChild(buildEntryRow(e));
+  }
+  applyTranslations();
+}
+
+// Shared item-description preset list, used by both the Add Item dialog
+// and inline row editing so they always stay in sync.
+const ITEM_OPTIONS = [
+  "Abono", "camisa vaquera", "camisa futbol", "bota de trabajo",
+  "bota vaquera", "joyas", "perfumes", "sombrero", "texana",
+];
+
+function populateAddItemDescriptionOptions() {
+  const select = document.getElementById("ne-desc-select");
+  const current = select.value;
+  select.innerHTML = ITEM_OPTIONS.map(o => `<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join("")
+    + `<option value="__other__" data-i18n="other_option">${t("other_option")}</option>`;
+  select.value = current || "Abono";
+}
+
+function buildEntryRow(e) {
+  const tr = document.createElement("tr");
+  tr.dataset.entryId = e.id;
+  tr.innerHTML = `
+    <td class="editable" contenteditable="false" data-field="date">${escapeHtml(e.date)}</td>
+    <td class="readonly-balance" data-field="time">${escapeHtml(e.time || "")}</td>
+    <td class="editable" data-field="item_description">${escapeHtml(e.item_description)}</td>
+    <td class="num editable deposit-cell" contenteditable="false" data-field="deposit">${fmtMoney(e.deposit)}</td>
+    <td class="num editable withdrawal-cell" contenteditable="false" data-field="withdrawal">${fmtMoney(e.withdrawal)}</td>
+    <td class="num readonly-balance" data-field="total_balance">${fmtMoney(e.total_balance)}</td>
+    <td class="entry-actions">
+      <button class="secondary edit-entry-btn" data-i18n="edit">Edit</button>
+      <button class="danger delete-entry-btn" data-i18n="delete">Delete</button>
+    </td>
+  `;
+
+  const textEditableCells = tr.querySelectorAll('.editable[data-field="date"], .editable[data-field="deposit"], .editable[data-field="withdrawal"]');
+  const descCell = tr.querySelector('[data-field="item_description"]');
+  const originalDescription = e.item_description || "";
+  const editBtn = tr.querySelector(".edit-entry-btn");
+  const deleteBtn = tr.querySelector(".delete-entry-btn");
+  let descSelect = null;
+  let descCustom = null;
+
+  function saveRow() {
+    const update = {};
+    textEditableCells.forEach(c => {
+      const field = c.dataset.field;
+      let val = c.textContent.trim();
+      if (["deposit", "withdrawal"].includes(field)) {
+        val = parseFloat(val) || 0;
+      }
+      update[field] = val;
+    });
+    if (descSelect) {
+      update.item_description = descSelect.value === "__other__"
+        ? (descCustom.value || "").trim()
+        : descSelect.value;
+    }
+    api(`/entries/${tr.dataset.entryId}`, { method: "PUT", body: JSON.stringify(update) })
+      .then(() => {
+        openCard(currentCustomerId, currentPage, currentSort);
+      });
+  }
+
+  function handleEnter(ev) {
+    if (ev.key === "Enter" && !ev.shiftKey) {
+      ev.preventDefault();
+      saveRow();
+    }
+  }
+
+  function enterEditMode() {
+    textEditableCells.forEach(c => {
+      c.contentEditable = "true";
+      c.addEventListener("keydown", handleEnter);
+    });
+
+    // Swap the description cell for the same preset dropdown + "other"
+    // text input used in the Add Item dialog, instead of free text.
+    const matches = ITEM_OPTIONS.some(o => o.toLowerCase() === originalDescription.toLowerCase());
+    const optionsHtml = ITEM_OPTIONS.map(o =>
+      `<option value="${escapeHtml(o)}"${o.toLowerCase() === originalDescription.toLowerCase() ? " selected" : ""}>${escapeHtml(o)}</option>`
+    ).join("");
+    descCell.innerHTML = `
+      <select class="row-desc-select">${optionsHtml}<option value="__other__"${!matches ? " selected" : ""}>${t("other_option")}</option></select>
+      <input type="text" class="row-desc-custom ${matches ? "hidden" : ""}" value="${matches ? "" : escapeHtml(originalDescription)}" placeholder="${t("custom_description")}">
+    `;
+    descSelect = descCell.querySelector(".row-desc-select");
+    descCustom = descCell.querySelector(".row-desc-custom");
+    descSelect.onchange = () => {
+      if (descSelect.value === "__other__") {
+        descCustom.classList.remove("hidden");
+        descCustom.focus();
+      } else {
+        descCustom.classList.add("hidden");
+      }
+    };
+    descSelect.addEventListener("keydown", handleEnter);
+    descCustom.addEventListener("keydown", handleEnter);
+
+    editBtn.textContent = t("save");
+    editBtn.dataset.i18n = "save";
+    if (textEditableCells.length) textEditableCells[0].focus();
+  }
+
+  editBtn.onclick = () => {
+    const editing = editBtn.dataset.i18n === "save";
+    if (!editing) {
+      enterEditMode();
+    } else {
+      saveRow();
+    }
+  };
+
+  deleteBtn.onclick = async () => {
+    if (confirm("Delete this item?")) {
+      await api(`/entries/${tr.dataset.entryId}`, { method: "DELETE" });
+      openCard(currentCustomerId, currentPage, currentSort);
+    }
+  };
+
+  return tr;
+}
+
+document.getElementById("sortSelect").onchange = (e) => {
+  openCard(currentCustomerId, 1, e.target.value);
+};
+
+document.getElementById("cardLangSelect").onchange = async (e) => {
+  const value = e.target.value || null;
+  await api(`/customers/${currentCustomerId}`, {
+    method: "PUT",
+    body: JSON.stringify({ language: value }),
+  });
+  activeCustomerLanguageOverride = value;
+  applyTranslations();
+};
+
+// ---------- Card header inline editing ----------
+document.querySelectorAll("#cardView .card-header .editable").forEach(el => {
+  el.addEventListener("dblclick", () => {
+    el.contentEditable = "true";
+    el.focus();
+  });
+  el.addEventListener("blur", async () => {
+    if (el.contentEditable !== "true") return;
+    el.contentEditable = "false";
+    const field = el.dataset.field;
+    let value = el.textContent.trim();
+    try {
+      const updated = await api(`/customers/${currentCustomerId}`, {
+        method: "PUT",
+        body: JSON.stringify({ [field]: value }),
+      });
+      el.textContent = updated[field] ?? "";
+    } catch (e) {
+      openCard(currentCustomerId, currentPage, currentSort);
+    }
+  });
+  el.addEventListener("keydown", (ev) => {
+    if (ev.key === "Enter" && el.contentEditable === "true") {
+      ev.preventDefault();
+      el.blur();
+    }
+  });
+});
+
+// ===================== Navigation =====================
+document.getElementById("backBtn").onclick = () => {
+  document.getElementById("cardView").classList.add("hidden");
+  document.getElementById("listView").classList.remove("hidden");
+  activeCustomerLanguageOverride = null;
+  applyTranslations();
+  loadCustomerList();
+};
+
+document.getElementById("prevPageBtn").onclick = () => {
+  if (currentPage > 1) openCard(currentCustomerId, currentPage - 1, currentSort);
+};
+document.getElementById("nextPageBtn").onclick = () => {
+  openCard(currentCustomerId, currentPage + 1, currentSort);
+};
+
+// ===================== Search =====================
+document.getElementById("searchBtn").onclick = () => {
+  loadCustomerList(document.getElementById("searchInput").value.trim());
+};
+document.getElementById("searchInput").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") loadCustomerList(e.target.value.trim());
+});
+
+// ===================== New customer dialog =====================
+const newCustomerDialog = document.getElementById("newCustomerDialog");
+document.getElementById("newCustomerBtn").onclick = () => {
+  document.getElementById("nc-name").value = "";
+  document.getElementById("nc-phone").value = "";
+  document.getElementById("nc-address").value = "";
+  document.getElementById("nc-date").value = new Date().toISOString().slice(0, 10);
+  newCustomerDialog.showModal();
+};
+document.getElementById("nc-cancel").onclick = () => newCustomerDialog.close();
+document.getElementById("nc-save").onclick = async () => {
+  const payload = {
+    name: document.getElementById("nc-name").value.trim(),
+    phone_number: document.getElementById("nc-phone").value.trim(),
+    address: document.getElementById("nc-address").value.trim(),
+    date_created: document.getElementById("nc-date").value,
+  };
+  if (!payload.name || !payload.phone_number || !payload.date_created) {
+    alert("Name, phone number, and date created are required.");
+    return;
+  }
+  const customer = await api("/customers", { method: "POST", body: JSON.stringify(payload) });
+  newCustomerDialog.close();
+  openCard(customer.id);
+};
+
+// ===================== New entry dialog =====================
+const newEntryDialog = document.getElementById("newEntryDialog");
+const neDescSelect = document.getElementById("ne-desc-select");
+const neDescCustom = document.getElementById("ne-desc-custom");
+
+neDescSelect.onchange = () => {
+  if (neDescSelect.value === "__other__") {
+    neDescCustom.classList.remove("hidden");
+    neDescCustom.focus();
+  } else {
+    neDescCustom.classList.add("hidden");
+  }
+};
+
+document.getElementById("addEntryBtn").onclick = () => {
+  document.getElementById("ne-date").value = new Date().toISOString().slice(0, 10);
+  populateAddItemDescriptionOptions();
+  neDescSelect.value = "Abono";
+  neDescCustom.value = "";
+  neDescCustom.classList.add("hidden");
+  document.getElementById("ne-deposit").value = "";
+  document.getElementById("ne-withdrawal").value = "";
+  newEntryDialog.showModal();
+  neDescSelect.focus();
+};
+document.getElementById("ne-cancel").onclick = () => newEntryDialog.close();
+document.getElementById("ne-save").onclick = async () => {
+  const description = neDescSelect.value === "__other__"
+    ? neDescCustom.value.trim()
+    : neDescSelect.value;
+  const payload = {
+    date: document.getElementById("ne-date").value,
+    item_description: description,
+    deposit: parseFloat(document.getElementById("ne-deposit").value) || 0,
+    withdrawal: parseFloat(document.getElementById("ne-withdrawal").value) || 0,
+  };
+  await api(`/customers/${currentCustomerId}/entries`, { method: "POST", body: JSON.stringify(payload) });
+  newEntryDialog.close();
+  openCard(currentCustomerId, currentPage, currentSort);
+};
+
+// ===================== Manage backups =====================
+const backupsDialog = document.getElementById("backupsDialog");
+
+function fmtBytes(n) {
+  if (n > 1024 * 1024) return (n / (1024 * 1024)).toFixed(1) + " MB";
+  if (n > 1024) return (n / 1024).toFixed(0) + " KB";
+  return n + " B";
+}
+function fmtWhen(iso) {
+  const d = new Date(iso);
+  return d.toLocaleString(undefined, {
+    year: "numeric", month: "short", day: "numeric",
+    hour: "2-digit", minute: "2-digit"
+  });
+}
+
+async function loadBackupsList() {
+  const backups = await api("/backups");
+  const list = document.getElementById("backupsList");
+  const empty = document.getElementById("backupsEmptyState");
+  list.innerHTML = "";
+  if (backups.length === 0) {
+    empty.classList.remove("hidden");
+    return;
+  }
+  empty.classList.add("hidden");
+  for (const b of backups) {
+    const row = document.createElement("div");
+    row.className = "backup-row";
+    row.innerHTML = `
+      <div class="backup-info">
+        <div class="when">${fmtWhen(b.created)}</div>
+        <div class="size">${fmtBytes(b.size_bytes)}</div>
+      </div>
+      <div class="backup-actions">
+        <button class="secondary restore-btn" data-i18n="restore">Restore</button>
+        <button class="danger delete-backup-btn" data-i18n="delete">Delete</button>
+      </div>
+    `;
+    row.querySelector(".restore-btn").onclick = async () => {
+      const ok = confirm(
+        "Restore this backup? This replaces your current data with this backup's data.\n\n" +
+        "A safety backup of what you have right now will be taken first, so this can be undone."
+      );
+      if (!ok) return;
+      await api(`/backups/${encodeURIComponent(b.filename)}/restore`, { method: "POST" });
+      await loadBackupsList();
+      if (currentCustomerId && !document.getElementById("cardView").classList.contains("hidden")) {
+        openCard(currentCustomerId, 1, currentSort);
+      } else {
+        loadCustomerList();
+      }
+      alert("Restore complete.");
+    };
+    row.querySelector(".delete-backup-btn").onclick = async () => {
+      if (!confirm("Delete this backup? This cannot be undone.")) return;
+      await api(`/backups/${encodeURIComponent(b.filename)}`, { method: "DELETE" });
+      await loadBackupsList();
+    };
+    list.appendChild(row);
+  }
+  applyTranslations();
+}
+
+document.getElementById("manageBackupsBtn").onclick = async () => {
+  await loadBackupsList();
+  backupsDialog.showModal();
+};
+document.getElementById("backups-close").onclick = () => backupsDialog.close();
+
+// ===================== History =====================
+const historyDialog = document.getElementById("historyDialog");
+const histStart = document.getElementById("hist-start");
+const histEnd = document.getElementById("hist-end");
+const histCustomerSelect = document.getElementById("hist-customer");
+
+function isoToday() {
+  return new Date().toISOString().slice(0, 10);
+}
+function isoDaysAgo(days) {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  return d.toISOString().slice(0, 10);
+}
+function isoMonthsAgo(months) {
+  const d = new Date();
+  d.setMonth(d.getMonth() - months);
+  return d.toISOString().slice(0, 10);
+}
+function isoYearsAgo(years) {
+  const d = new Date();
+  d.setFullYear(d.getFullYear() - years);
+  return d.toISOString().slice(0, 10);
+}
+
+async function populateHistoryCustomerDropdown() {
+  const customers = await api("/customers");
+  const current = histCustomerSelect.value;
+  histCustomerSelect.innerHTML = `<option value="" data-i18n="all_customers">${t("all_customers")}</option>`;
+  for (const c of customers) {
+    const opt = document.createElement("option");
+    opt.value = c.id;
+    opt.textContent = c.name;
+    histCustomerSelect.appendChild(opt);
+  }
+  histCustomerSelect.value = current || "";
+}
+
+async function runHistorySearch() {
+  const params = new URLSearchParams({ start: histStart.value, end: histEnd.value });
+  if (histCustomerSelect.value) params.set("customer_id", histCustomerSelect.value);
+  const data = await api(`/history?${params.toString()}`);
+
+  const totalsEl = document.getElementById("historyTotals");
+  const resultsEl = document.getElementById("historyResults");
+  const emptyEl = document.getElementById("historyEmptyState");
+
+  if (data.count === 0) {
+    totalsEl.classList.add("hidden");
+    resultsEl.innerHTML = "";
+    emptyEl.classList.remove("hidden");
+    return;
+  }
+  emptyEl.classList.add("hidden");
+  totalsEl.classList.remove("hidden");
+  document.getElementById("hist-total-deposit").textContent = "$" + fmtMoney(data.total_deposit);
+  document.getElementById("hist-total-withdrawal").textContent = "$" + fmtMoney(data.total_withdrawal);
+  document.getElementById("hist-total-net").textContent = "$" + fmtMoney(data.net);
+  document.getElementById("hist-count").textContent = data.count;
+
+  const rows = data.entries.map(e => `
+    <tr>
+      <td>${escapeHtml(e.date)}</td>
+      <td>${escapeHtml(e.time || "")}</td>
+      <td>${escapeHtml(e.customer_name)}</td>
+      <td>${escapeHtml(e.item_description)}</td>
+      <td class="num deposit-cell">${fmtMoney(e.deposit)}</td>
+      <td class="num withdrawal-cell">${fmtMoney(e.withdrawal)}</td>
+    </tr>
+  `).join("");
+  resultsEl.innerHTML = `
+    <table class="history-table">
+      <thead><tr>
+        <th data-i18n="date">Date</th><th data-i18n="time_col">Time</th><th>${t("customer_filter_label")}</th>
+        <th data-i18n="item_description">Item Description</th>
+        <th class="num" data-i18n="deposit">Deposit</th>
+        <th class="num" data-i18n="withdrawal">Withdrawal</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
+function setHistoryRangeAndRun(startIso) {
+  histStart.value = startIso;
+  histEnd.value = isoToday();
+  runHistorySearch();
+}
+document.getElementById("hist-today").onclick = () => setHistoryRangeAndRun(isoToday());
+document.getElementById("hist-week").onclick = () => setHistoryRangeAndRun(isoDaysAgo(7));
+document.getElementById("hist-month").onclick = () => setHistoryRangeAndRun(isoMonthsAgo(1));
+document.getElementById("hist-year").onclick = () => setHistoryRangeAndRun(isoYearsAgo(1));
+document.getElementById("hist-run").onclick = runHistorySearch;
+
+document.getElementById("historyBtn").onclick = async () => {
+  await populateHistoryCustomerDropdown();
+  const cardOpen = currentCustomerId && !document.getElementById("cardView").classList.contains("hidden");
+  histCustomerSelect.value = cardOpen ? currentCustomerId : "";
+  histStart.value = isoToday();
+  histEnd.value = isoToday();
+  document.getElementById("historyTotals").classList.add("hidden");
+  document.getElementById("historyResults").innerHTML = "";
+  document.getElementById("historyEmptyState").classList.add("hidden");
+  historyDialog.showModal();
+};
+document.getElementById("history-close").onclick = () => historyDialog.close();
+
+// ===================== Init =====================
+applyTranslations();
+loadCustomerList();
+</script>
+</body>
+</html>
