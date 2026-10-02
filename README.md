@@ -9,6 +9,10 @@ a family-owned check-cashing business, where it has been in daily use on-site.
 Everything runs on one machine: data lives in a local SQLite file and nothing
 leaves the computer.
 
+![Customer card with sample data](docs/screenshot.png)
+
+*Screenshot uses invented sample customers.*
+
 ## Features
 
 - **Customer cards** with inline editing: double-click a header field or edit any row.
