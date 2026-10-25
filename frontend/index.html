@@ -841,7 +841,7 @@ document.getElementById("newCustomerBtn").onclick = () => {
   document.getElementById("nc-name").value = "";
   document.getElementById("nc-phone").value = "";
   document.getElementById("nc-address").value = "";
-  document.getElementById("nc-date").value = new Date().toISOString().slice(0, 10);
+  document.getElementById("nc-date").value = localISO(new Date());
   newCustomerDialog.showModal();
 };
 document.getElementById("nc-cancel").onclick = () => newCustomerDialog.close();
@@ -876,7 +876,7 @@ neDescSelect.onchange = () => {
 };
 
 document.getElementById("addEntryBtn").onclick = () => {
-  document.getElementById("ne-date").value = new Date().toISOString().slice(0, 10);
+  document.getElementById("ne-date").value = localISO(new Date());
   populateAddItemDescriptionOptions();
   neDescSelect.value = "Abono";
   neDescCustom.value = "";
@@ -978,23 +978,30 @@ const histStart = document.getElementById("hist-start");
 const histEnd = document.getElementById("hist-end");
 const histCustomerSelect = document.getElementById("hist-customer");
 
+// Local-time YYYY-MM-DD (toISOString() uses UTC, which rolls to tomorrow in the evening)
+function localISO(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
 function isoToday() {
-  return new Date().toISOString().slice(0, 10);
+  return localISO(new Date());
 }
 function isoDaysAgo(days) {
   const d = new Date();
   d.setDate(d.getDate() - days);
-  return d.toISOString().slice(0, 10);
+  return localISO(d);
 }
 function isoMonthsAgo(months) {
   const d = new Date();
   d.setMonth(d.getMonth() - months);
-  return d.toISOString().slice(0, 10);
+  return localISO(d);
 }
 function isoYearsAgo(years) {
   const d = new Date();
   d.setFullYear(d.getFullYear() - years);
-  return d.toISOString().slice(0, 10);
+  return localISO(d);
 }
 
 async function populateHistoryCustomerDropdown() {
