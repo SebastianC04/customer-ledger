@@ -3,7 +3,8 @@ import re
 import sys
 import threading
 import time
-from datetime import datetime
+import unicodedata
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List
 
 from fastapi import FastAPI, Depends, HTTPException, Query
@@ -33,7 +34,7 @@ app.add_middleware(
 )
 
 ENTRIES_PER_PAGE = 35  # within the 30-40 range requested; change if you want a different page size
-BACKUP_INTERVAL_SECONDS = 30 * 60  # automatic background backup cadence while the app is open
+BACKUP_CHECK_SECONDS = 60  # how often the scheduler checks for a due backup slot (see backup.py)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 if getattr(sys, "frozen", False):
@@ -45,22 +46,23 @@ else:
 
 
 @app.on_event("startup")
-def _startup_backup_and_scheduler():
-    # One backup right away so every session starts from a known-good copy...
-    backup.create_backup()
-
-    # ...then keep backing up periodically for as long as the app stays open.
+def _start_backup_scheduler():
+    """Checks every minute whether an hourly backup slot (10:30 AM - 7:00 PM)
+    is due; backup.run_scheduled_backup decides and also collapses old days."""
     def _loop():
         while True:
-            time.sleep(BACKUP_INTERVAL_SECONDS)
-            backup.create_backup()
+            try:
+                backup.run_scheduled_backup()
+            except Exception as e:  # never let a backup hiccup kill the thread
+                print(f"Scheduled backup failed: {e}", file=sys.stderr)
+            time.sleep(BACKUP_CHECK_SECONDS)
 
     threading.Thread(target=_loop, daemon=True).start()
 
 
 @app.post("/api/backup")
 def trigger_backup():
-    """Manual backup trigger, used by the 'Backup Now' button."""
+    """Manual backup trigger, used by the 'Backup Now' button in Manage Backups."""
     path = backup.create_backup()
     if path is None:
         raise HTTPException(status_code=404, detail="No database found to back up yet")
@@ -103,16 +105,18 @@ def delete_backup(filename: str):
 def recalculate_balances(customer_id: int, db: Session):
     """Recomputes the running total_balance for every entry on a customer's
     card, in order: each entry's balance = previous balance + deposit -
-    withdrawal, starting from 0. Only called when a NEW entry is added —
-    editing or deleting an existing entry does not trigger this, so those
-    actions never touch other entries' balances (by design)."""
+    withdrawal, starting from the customer's opening (carried-over) balance.
+    Only called when a NEW entry is added — editing or deleting an existing
+    entry (or the opening balance) does not trigger this, so those actions
+    never touch other entries' balances (by design)."""
+    customer = db.query(models.Customer).filter(models.Customer.id == customer_id).first()
     entries = (
         db.query(models.Entry)
         .filter(models.Entry.customer_id == customer_id)
         .order_by(models.Entry.sort_order)
         .all()
     )
-    running = 0.0
+    running = (customer.opening_balance or 0.0) if customer else 0.0
     for e in entries:
         running += (e.deposit or 0.0) - (e.withdrawal or 0.0)
         e.total_balance = running
@@ -214,6 +218,7 @@ def get_customer(
         "date_created": customer.date_created,
         "time_created": customer.time_created,
         "language": customer.language,
+        "opening_balance": customer.opening_balance or 0.0,
         "entries": [schemas.EntryOut.model_validate(e) for e in entries],
         "page": page,
         "total_pages": total_pages,
@@ -316,30 +321,82 @@ def delete_entry(entry_id: int, db: Session = Depends(get_db)):
 # History / activity endpoint
 # ---------------------------------------------------------------------------
 
+@app.get("/api/item-descriptions")
+def list_item_descriptions(db: Session = Depends(get_db)):
+    """Every distinct item description used so far, for the History item filter."""
+    rows = db.query(models.Entry.item_description).distinct().all()
+    seen = {}
+    for (desc,) in rows:
+        if desc and desc.strip():
+            seen.setdefault(desc.strip().casefold(), desc.strip())
+    return sorted(seen.values(), key=str.casefold)
+
+
+def _fold(s: str) -> str:
+    """Lowercase without accents, so 'camison' matches 'Camisón'."""
+    return "".join(
+        ch for ch in unicodedata.normalize("NFD", s) if not unicodedata.combining(ch)
+    ).casefold()
+
+
+def _parse_time_or_none(entry_time: Optional[str]):
+    if not entry_time:
+        return None
+    try:
+        return schemas.parse_time(entry_time)
+    except ValueError:
+        return None
+
+
 @app.get("/api/history")
 def get_history(
     start: str = Query(..., description="Start of range, yyyy-mm-dd or mm/dd/yyyy"),
     end: str = Query(..., description="End of range, yyyy-mm-dd or mm/dd/yyyy"),
-    customer_id: Optional[int] = Query(None, description="Limit to one customer; omit for the whole database"),
+    customer_ids: Optional[str] = Query(None, description="Comma-separated customer ids; omit for the whole database"),
+    item: Optional[str] = Query(None, description="Item description contains this text (case-insensitive)"),
+    start_time: Optional[str] = Query(None, description="Earliest time of day, e.g. 10:00 or 10:00 AM"),
+    end_time: Optional[str] = Query(None, description="Latest time of day, e.g. 19:00 or 7:00 PM"),
     db: Session = Depends(get_db),
 ):
-    """Every ledger entry across (optionally) one customer or the whole
-    database, within a date range, plus totals for that range — used by
-    the History panel's date presets (today/week/month/year) and its
-    per-day/week/month/year deposit tally."""
+    """Ledger entries matching every given filter (date range, customers,
+    item description, time of day), plus totals for the whole match and
+    per item description. Used by the History panel."""
     try:
         start_dt = schemas.parse_flexible_date(start)
         end_dt = schemas.parse_flexible_date(end)
+        t_from = schemas.parse_time(start_time) if start_time else None
+        t_to = schemas.parse_time(end_time) if end_time else None
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    if start_dt > end_dt:
+        start_dt, end_dt = end_dt, start_dt
+
+    ids = None
+    if customer_ids is not None:
+        try:
+            ids = [int(x) for x in customer_ids.split(",") if x.strip()]
+        except ValueError:
+            raise HTTPException(status_code=400, detail="customer_ids must be numbers")
+
+    item_q = _fold(item.strip()) if item and item.strip() else None
+
+    def time_ok(t) -> bool:
+        if t_from is None and t_to is None:
+            return True
+        if t is None:
+            return False  # time filter set but entry has no time recorded
+        if t_from and t_to and t_from > t_to:  # overnight range, e.g. 8 PM - 2 AM
+            return t >= t_from or t <= t_to
+        return (t_from is None or t >= t_from) and (t_to is None or t <= t_to)
 
     query = db.query(models.Entry, models.Customer).join(
         models.Customer, models.Entry.customer_id == models.Customer.id
     )
-    if customer_id is not None:
-        query = query.filter(models.Entry.customer_id == customer_id)
+    if ids is not None:
+        query = query.filter(models.Entry.customer_id.in_(ids))
 
     results = []
+    by_item: dict[str, dict] = {}
     total_deposit = 0.0
     total_withdrawal = 0.0
     for entry, customer in query.all():
@@ -349,33 +406,179 @@ def get_history(
             entry_dt = schemas.parse_flexible_date(entry.date)
         except ValueError:
             continue
-        if start_dt <= entry_dt <= end_dt:
-            total_deposit += entry.deposit or 0.0
-            total_withdrawal += entry.withdrawal or 0.0
-            results.append({
-                "entry_id": entry.id,
-                "date": entry.date,
-                "time": entry.time,
-                "item_description": entry.item_description,
-                "deposit": entry.deposit,
-                "withdrawal": entry.withdrawal,
-                "total_balance": entry.total_balance,
-                "customer_id": customer.id,
-                "customer_name": customer.name,
-                "customer_phone": customer.phone_number,
-            })
+        if not (start_dt <= entry_dt <= end_dt):
+            continue
+        desc = (entry.item_description or "").strip()
+        if item_q and item_q not in _fold(desc):
+            continue
+        entry_t = _parse_time_or_none(entry.time)
+        if not time_ok(entry_t):
+            continue
 
-    results.sort(key=lambda r: schemas.parse_flexible_date(r["date"]), reverse=True)
+        dep = entry.deposit or 0.0
+        wd = entry.withdrawal or 0.0
+        total_deposit += dep
+        total_withdrawal += wd
+
+        group = by_item.setdefault(desc.casefold(), {
+            "item_description": desc, "total_deposit": 0.0,
+            "total_withdrawal": 0.0, "count": 0,
+        })
+        group["total_deposit"] += dep
+        group["total_withdrawal"] += wd
+        group["count"] += 1
+
+        results.append({
+            "entry_id": entry.id,
+            "date": entry.date,
+            "time": entry.time,
+            "item_description": entry.item_description,
+            "deposit": entry.deposit,
+            "withdrawal": entry.withdrawal,
+            "total_balance": entry.total_balance,
+            "customer_id": customer.id,
+            "customer_name": customer.name,
+            "customer_phone": customer.phone_number,
+            "_sort": (entry_dt, entry_t or datetime.min.time()),
+        })
+
+    results.sort(key=lambda r: r["_sort"], reverse=True)  # newest date, then latest time, first
+    for r in results:
+        del r["_sort"]
+
+    items = sorted(by_item.values(), key=lambda g: g["item_description"].casefold())
+    for g in items:
+        g["net"] = g["total_deposit"] - g["total_withdrawal"]
 
     return {
         "start": start_dt.strftime("%m/%d/%Y"),
         "end": end_dt.strftime("%m/%d/%Y"),
-        "customer_id": customer_id,
         "count": len(results),
         "total_deposit": total_deposit,
         "total_withdrawal": total_withdrawal,
         "net": total_deposit - total_withdrawal,
         "entries": results,
+        "by_item": items,
+    }
+
+
+# ---------------------------------------------------------------------------
+# One-time repair: dates shifted by the old "after 5 PM" bug
+# ---------------------------------------------------------------------------
+# Older versions filled in "today" using UTC, so anything added after 5 PM
+# Pacific (4 PM in winter) got the next day's date. Entries can be detected
+# exactly: created_at is stored in UTC, so a buggy entry's date equals
+# created_at's UTC date AND is one day after its local date. Entries made by
+# the fixed version are saved with the local date, so they never match.
+#
+# Cards made by older versions have no created_at, so a card is only a
+# candidate when its time_created was late enough that UTC was already the
+# next day. It's *confirmed* when the card's first item was added before the
+# card's stored date and time (impossible unless that date is a day ahead).
+# Cards made by the fixed version have created_at and are never candidates;
+# fixed cards get date_fix_applied so they can't be shifted twice.
+
+def _utc_naive_to_local_naive(dt: datetime) -> datetime:
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+    return dt.replace(tzinfo=timezone.utc).astimezone().replace(tzinfo=None)
+
+
+def _shifted_entries(db: Session):
+    """(entry, customer, correct_local_date) for every entry that matches the bug."""
+    found = []
+    rows = db.query(models.Entry, models.Customer).join(
+        models.Customer, models.Entry.customer_id == models.Customer.id
+    )
+    for entry, customer in rows.all():
+        if not entry.created_at or not entry.date:
+            continue
+        try:
+            stored = schemas.parse_flexible_date(entry.date).date()
+        except ValueError:
+            continue
+        created_utc = entry.created_at
+        if created_utc.tzinfo is not None:
+            created_utc = created_utc.astimezone(timezone.utc).replace(tzinfo=None)
+        local_day = created_utc.replace(tzinfo=timezone.utc).astimezone().date()
+        if stored == created_utc.date() and stored == local_day + timedelta(days=1):
+            found.append((entry, customer, local_day))
+    return found
+
+
+def _possibly_shifted_customers(db: Session):
+    """(customer, possible_correct_date, confirmed) for old-version cards
+    created late enough in the day that the bug would have stamped tomorrow's
+    date. confirmed=True when the card's first item predates the card's
+    stored date/time; otherwise it can't be told apart from a correct card."""
+    first_item = dict(
+        db.query(models.Entry.customer_id, func.min(models.Entry.created_at))
+        .group_by(models.Entry.customer_id)
+        .all()
+    )
+    found = []
+    for c in db.query(models.Customer).all():
+        if (not c.date_created or not c.time_created
+                or c.date_fix_applied or c.created_at is not None):
+            continue
+        try:
+            stored = schemas.parse_flexible_date(c.date_created).date()
+            t = schemas.parse_time(c.time_created)
+        except ValueError:
+            continue
+        candidate = stored - timedelta(days=1)
+        # Naive datetime -> astimezone() treats it as this computer's local time.
+        utc_day = datetime.combine(candidate, t).astimezone().astimezone(timezone.utc).date()
+        if utc_day != stored:
+            continue
+        first = first_item.get(c.id)
+        if isinstance(first, str):  # some SQLite drivers hand back text for MIN()
+            first = datetime.fromisoformat(first)
+        confirmed = bool(first) and _utc_naive_to_local_naive(first) < datetime.combine(stored, t)
+        found.append((c, candidate, confirmed))
+    return found
+
+
+@app.get("/api/maintenance/shifted-dates")
+def list_shifted_dates(db: Session = Depends(get_db)):
+    fmt = lambda d: d.strftime("%m/%d/%Y")
+    return {
+        "entries": [{
+            "entry_id": e.id, "customer_id": c.id, "customer_name": c.name,
+            "item_description": e.item_description, "time": e.time,
+            "current_date": e.date, "correct_date": fmt(day),
+        } for e, c, day in _shifted_entries(db)],
+        "customers": [{
+            "customer_id": c.id, "customer_name": c.name, "time_created": c.time_created,
+            "current_date": c.date_created, "possible_date": fmt(day),
+            "confirmed": confirmed,
+        } for c, day, confirmed in _possibly_shifted_customers(db)],
+    }
+
+
+@app.post("/api/maintenance/fix-dates")
+def fix_shifted_dates(req: schemas.DateFixRequest, db: Session = Depends(get_db)):
+    """Moves the chosen entries/cards back one day. Takes a safety backup
+    first. Only items that still match the bug are changed, so a stale or
+    repeated request can't shift anything twice."""
+    entry_ids = set(req.entry_ids)
+    customer_ids = set(req.customer_ids)
+    entries = [(e, day) for e, _, day in _shifted_entries(db) if e.id in entry_ids]
+    customers = [(c, day) for c, day, _ in _possibly_shifted_customers(db) if c.id in customer_ids]
+    if not entries and not customers:
+        return {"entries_fixed": 0, "customers_fixed": 0, "backup": None}
+
+    safety = backup.create_backup(tag=backup.PRE_DATE_FIX_TAG)
+    for e, day in entries:
+        e.date = day.strftime("%m/%d/%Y")
+    for c, day in customers:
+        c.date_created = day.strftime("%m/%d/%Y")
+        c.date_fix_applied = 1
+    db.commit()
+    return {
+        "entries_fixed": len(entries),
+        "customers_fixed": len(customers),
+        "backup": os.path.basename(safety) if safety else None,
     }
 
 
@@ -385,7 +588,11 @@ def get_history(
 
 @app.get("/")
 def serve_index():
-    return FileResponse(os.path.join(FRONTEND_DIR, "index.html"))
+    # no-cache: always revalidate, so an updated app never shows a stale UI
+    return FileResponse(
+        os.path.join(FRONTEND_DIR, "index.html"),
+        headers={"Cache-Control": "no-cache"},
+    )
 
 
 app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")

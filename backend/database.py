@@ -64,6 +64,9 @@ def run_migrations():
     expected_columns = [
         ("customers", "time_created", "TEXT", None),
         ("customers", "language", "TEXT", None),
+        ("customers", "opening_balance", "REAL", None),
+        ("customers", "date_fix_applied", "INTEGER", None),
+        ("customers", "created_at", "DATETIME", None),
         ("entries", "time", "TEXT", None),
     ]
 

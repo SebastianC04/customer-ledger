@@ -14,6 +14,15 @@ class Customer(Base):
     date_created = Column(String, nullable=False)  # stored as text (e.g. "09/16/2026") to keep manual entry simple
     time_created = Column(String, nullable=True)   # e.g. "12:23 PM" — auto-stamped at creation if not given
     language = Column(String, nullable=True)        # "en" / "es" override for this customer's card; None = use app default
+    # Balance carried over from the old paper system. Running balances start
+    # from this instead of 0 (see main.py:recalculate_balances).
+    opening_balance = Column(Float, nullable=True, default=0.0)
+    # Set once "Date created" was moved back a day by the after-5 PM date fix,
+    # so the same card is never shifted twice (see main.py:fix_shifted_dates).
+    date_fix_applied = Column(Integer, nullable=True)
+    # When the card was really created (UTC). Empty for cards made by older
+    # versions; set for every new card, so the date fix never flags them.
+    created_at = Column(DateTime, nullable=True, default=lambda: datetime.now(timezone.utc))
 
     entries = relationship(
         "Entry", back_populates="customer", cascade="all, delete-orphan",

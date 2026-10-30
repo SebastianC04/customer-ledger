@@ -196,6 +196,14 @@
     width: 90%;
   }
   dialog.dialog-wide { max-width: 640px; }
+  /* Pin History near the top so it doesn't jump as results change size */
+  /* History grows with its results up to nearly full height, then the
+     results list scrolls; pinned near the top so it doesn't jump around. */
+  #historyDialog { margin-top: 3vh; max-width: 920px; max-height: 94vh; overflow: hidden; }
+  #historyDialog .dialog-inner { display: flex; flex-direction: column; max-height: 94vh; overflow-y: auto; }
+  #historyDialog .dialog-inner > * { flex-shrink: 0; }
+  #historyDialog #hist-clear { align-self: flex-start; }
+  #historyDialog #historyResults { flex: 1 1 auto; min-height: 140px; max-height: none; overflow-y: auto; }
   dialog::backdrop { background: rgba(0,0,0,0.4); }
   .dialog-inner { padding: 20px 24px; }
   .dialog-inner h2 { margin-top: 0; font-size: 1.15rem; }
@@ -252,7 +260,70 @@
     border: 1px solid var(--paper-line); padding: 5px 7px; text-align: left;
   }
   table.history-table th { background: var(--accent-light); }
-  #historyResults { max-height: 340px; overflow-y: auto; }
+  table.history-table td.num, table.history-table th.num { text-align: right; }
+  table.history-table tr.clickable { cursor: pointer; }
+  table.history-table tr.clickable:hover { background: var(--accent-light); }
+
+  .history-filters { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
+  .history-filters .form-row { flex: 1; min-width: 130px; margin-bottom: 8px; }
+  .history-presets button.active { background: var(--accent); color: #fff; }
+  .history-tabs-row {
+    display: flex; justify-content: space-between; align-items: flex-end; gap: 10px;
+    flex-wrap: wrap; margin: 10px 0 12px; border-bottom: 2px solid var(--accent);
+  }
+  .history-tabs-row select { padding: 5px 8px; font-size: 0.85rem; margin-bottom: 4px; }
+  .history-tabs { display: flex; gap: 0; }
+  .history-pager {
+    display: flex; justify-content: space-between; align-items: center; gap: 10px;
+    flex-wrap: wrap; margin-top: 10px; font-size: 0.88rem;
+  }
+  .history-pager select { padding: 4px 8px; margin-left: 6px; }
+  .history-pager button { padding: 5px 10px; }
+  table.history-table td.nowrap { white-space: nowrap; }
+  tr.carried-over td { font-style: italic; color: #6a6a63; background: var(--accent-light); }
+
+  /* Inputs with a clear (x) button, shown only when there's text */
+  .clearable { position: relative; display: inline-block; }
+  .combo.clearable { display: block; }
+  .clearable input { padding-right: 30px; width: 100%; }
+  .clear-btn {
+    position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+    background: none; border: none; color: #888; font-size: 1.25rem;
+    line-height: 1; padding: 2px 7px;
+  }
+  .clear-btn:hover { color: var(--ink); background: none; }
+  .clearable input:placeholder-shown ~ .clear-btn { display: none; }
+  .history-tabs button {
+    border-radius: 4px 4px 0 0; background: #fff; color: var(--accent);
+    border-bottom: none; padding: 6px 14px; font-size: 0.85rem;
+  }
+  .history-tabs button.active { background: var(--accent); color: #fff; }
+  .hint { font-size: 0.8rem; color: #777; }
+
+  /* Type-to-search customer picker */
+  .combo { position: relative; }
+  .combo input { width: 100%; }
+  .combo-list {
+    position: absolute; left: 0; right: 0; top: 100%; z-index: 10;
+    background: #fff; border: 1px solid #ccc; border-radius: 0 0 4px 4px;
+    max-height: 220px; overflow-y: auto; box-shadow: 0 4px 10px rgba(0,0,0,0.12);
+  }
+  .combo-option { padding: 7px 10px; cursor: pointer; font-size: 0.88rem; }
+  .combo-option .phone { color: #888; font-size: 0.8rem; margin-left: 6px; }
+  .combo-option.active, .combo-option:hover { background: var(--accent-light); }
+  .combo-empty { padding: 7px 10px; color: #888; font-size: 0.85rem; }
+
+  .notice-banner {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    flex-wrap: wrap; background: #fff4d6; border: 1px solid #e0c77a;
+    border-radius: 6px; padding: 10px 14px; margin-bottom: 16px; font-size: 0.92rem;
+  }
+  .notice-banner .notice-actions { display: flex; gap: 8px; }
+  .notice-banner button { padding: 5px 12px; font-size: 0.85rem; }
+  #dateFixDialog h3 { font-size: 0.98rem; margin: 16px 0 6px; }
+  #dateFixDialog .fix-list { max-height: 260px; overflow-y: auto; }
+  #dateFixDialog td.new-date { color: var(--green); font-weight: bold; }
+  #dateFixDialog td.old-date { color: var(--danger); text-decoration: line-through; }
 </style>
 </head>
 <body>
@@ -261,13 +332,13 @@
   <h1 data-i18n="app_title">TARJETAS</h1>
   <div class="top-controls">
     <div class="search-bar">
-      <input id="searchInput" type="text" data-i18n-placeholder="search_placeholder" placeholder="Search by name or phone number...">
-      <button class="secondary" id="searchBtn" data-i18n="search">Search</button>
-      <button class="secondary" id="clearSearchBtn" data-i18n="clear">Clear</button>
+      <span class="clearable">
+        <input id="searchInput" type="text" autocomplete="off" data-i18n-placeholder="search_placeholder" placeholder="Search by name or phone number...">
+        <button type="button" class="clear-btn" data-clears="searchInput" aria-label="Clear">&times;</button>
+      </span>
     </div>
     <button id="newCustomerBtn" data-i18n="new_customer">+ New Customer</button>
     <button class="secondary" id="historyBtn" data-i18n="history">History</button>
-    <button class="secondary" id="backupNowBtn" data-i18n="backup_now">Backup Now</button>
     <button class="secondary" id="manageBackupsBtn" data-i18n="manage_backups">Manage Backups</button>
     <button class="secondary" id="langToggleBtn">ES</button>
   </div>
@@ -275,8 +346,16 @@
 
 <main>
   <div id="listView">
+    <div id="dateFixBanner" class="notice-banner hidden">
+      <span id="dateFixBannerText"></span>
+      <span class="notice-actions">
+        <button id="dateFixReviewBtn" data-i18n="review">Review</button>
+        <button class="secondary" id="dateFixDismissBtn" data-i18n="dismiss">Dismiss</button>
+      </span>
+    </div>
     <div id="customerList"></div>
     <div id="listEmptyState" class="empty-state hidden" data-i18n="no_customers">No customers yet. Click "+ New Customer" to create one.</div>
+    <div id="listNoMatchState" class="empty-state hidden" data-i18n="no_matches">No customers match your search.</div>
   </div>
 
   <div id="cardView" class="hidden">
@@ -293,6 +372,7 @@
           <span><span data-i18n="phone_label">Phone</span>: <span class="editable" id="fld-phone" contenteditable="false" data-field="phone_number"></span></span>
           <span><span data-i18n="address_label">Address</span>: <span class="editable" id="fld-address" contenteditable="false" data-field="address"></span></span>
           <span><span data-i18n="date_created_label">Date created</span>: <span class="editable" id="fld-date_created" contenteditable="false" data-field="date_created"></span></span>
+          <span><span data-i18n="starting_balance">Starting balance</span>: <span class="editable" id="fld-opening_balance" contenteditable="false" data-field="opening_balance"></span></span>
         </div>
       </div>
 
@@ -351,6 +431,11 @@
       <label data-i18n="date_created_label">Date created</label>
       <input id="nc-date" type="date">
     </div>
+    <div class="form-row">
+      <label data-i18n="opening_balance_label">Existing balance (optional)</label>
+      <input id="nc-opening" type="number" step="0.01" placeholder="0.00">
+      <span class="hint" data-i18n="opening_balance_hint">For cards moving over from the old system. New items add on top of this balance.</span>
+    </div>
     <div class="dialog-actions">
       <button class="secondary" id="nc-cancel" data-i18n="cancel">Cancel</button>
       <button id="nc-save" data-i18n="create_card">Create Card</button>
@@ -391,15 +476,64 @@
 <dialog id="backupsDialog" class="dialog-wide">
   <div class="dialog-inner">
     <h2 data-i18n="manage_backups_title">Manage Backups</h2>
-    <p style="font-size:0.85rem; color:#666; margin-top:-8px;" data-i18n="backups_explainer">
-      A backup is taken automatically on launch and every 30 minutes. Restoring
-      overwrites your current data with the chosen backup — a safety backup of
-      what you had is taken first, so restoring is itself reversible.
-    </p>
+    <p style="font-size:0.85rem; color:#666; margin-top:-8px;" data-i18n="backups_explainer"></p>
     <div id="backupsList" style="max-height:320px; overflow-y:auto; margin:14px 0;"></div>
     <div id="backupsEmptyState" class="empty-state hidden" style="padding:20px 0;" data-i18n="no_backups">No backups yet.</div>
-    <div class="dialog-actions">
+    <div class="dialog-actions" style="justify-content:space-between;">
+      <span style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button id="backupNowBtn" data-i18n="backup_now">Backup Now</button>
+        <button class="secondary" id="checkDatesBtn" data-i18n="check_dates">Check for wrong dates</button>
+      </span>
       <button class="secondary" id="backups-close" data-i18n="close">Close</button>
+    </div>
+  </div>
+</dialog>
+
+<!-- Review/fix dates shifted by the old after-5 PM bug -->
+<dialog id="dateFixDialog" class="dialog-wide">
+  <div class="dialog-inner">
+    <h2 data-i18n="date_fix_title">Fix Wrong Dates</h2>
+    <p class="hint" style="font-size:0.85rem; margin-top:-8px;" data-i18n="date_fix_explainer"></p>
+    <div id="dateFixNone" class="empty-state hidden" style="padding:20px 0;" data-i18n="date_fix_none">No wrong dates found.</div>
+
+    <div id="dateFixEntriesSection" class="hidden">
+      <h3 data-i18n="date_fix_entries_heading">Items with the wrong date</h3>
+      <div class="fix-list">
+        <table class="history-table">
+          <thead><tr>
+            <th><input type="checkbox" id="dateFixAllEntries" checked></th>
+            <th data-i18n="customer_filter_label">Customer</th>
+            <th data-i18n="item_description">Item Description</th>
+            <th data-i18n="time_col">Time</th>
+            <th data-i18n="date_fix_now">Now</th>
+            <th data-i18n="date_fix_will_be">Will be</th>
+          </tr></thead>
+          <tbody id="dateFixEntryRows"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="dateFixCustomersSection" class="hidden">
+      <h3 data-i18n="date_fix_customers_heading">Cards that might have the wrong "Date created"</h3>
+      <p class="hint" data-i18n="date_fix_customers_hint"></p>
+      <div class="fix-list">
+        <table class="history-table">
+          <thead><tr>
+            <th><input type="checkbox" id="dateFixAllCustomers"></th>
+            <th data-i18n="customer_filter_label">Customer</th>
+            <th data-i18n="time_col">Time</th>
+            <th data-i18n="date_fix_now">Now</th>
+            <th data-i18n="date_fix_will_be">Will be</th>
+            <th data-i18n="date_fix_why">Why it's listed</th>
+          </tr></thead>
+          <tbody id="dateFixCustomerRows"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="dialog-actions">
+      <button class="secondary" id="dateFixCancel" data-i18n="close">Close</button>
+      <button id="dateFixApply" data-i18n="date_fix_apply">Fix selected dates</button>
     </div>
   </div>
 </dialog>
@@ -414,23 +548,57 @@
       <button class="secondary" id="hist-month" data-i18n="preset_month">1 Month</button>
       <button class="secondary" id="hist-year" data-i18n="preset_year">1 Year</button>
     </div>
-    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px;">
-      <div class="form-row" style="flex:1; min-width:130px;">
+    <div class="history-filters">
+      <div class="form-row">
         <label data-i18n="from_label">From</label>
         <input id="hist-start" type="date">
       </div>
-      <div class="form-row" style="flex:1; min-width:130px;">
+      <div class="form-row">
         <label data-i18n="to_label">To</label>
         <input id="hist-end" type="date">
       </div>
-      <div class="form-row" style="flex:1; min-width:160px;">
-        <label data-i18n="customer_filter_label">Customer</label>
-        <select id="hist-customer">
-          <option value="" data-i18n="all_customers">All Customers</option>
-        </select>
+      <div class="form-row">
+        <label data-i18n="from_time_label">From time</label>
+        <input id="hist-start-time" type="time">
+      </div>
+      <div class="form-row">
+        <label data-i18n="to_time_label">To time</label>
+        <input id="hist-end-time" type="time">
       </div>
     </div>
-    <button id="hist-run" data-i18n="run_search">Show Activity</button>
+    <div class="history-filters">
+      <div class="form-row" style="min-width:200px;">
+        <label data-i18n="customer_filter_label">Customer</label>
+        <div class="combo clearable">
+          <input id="hist-customer-input" type="text" autocomplete="off" data-i18n-placeholder="customer_search_placeholder" placeholder="All customers (type to search)">
+          <button type="button" class="clear-btn" data-clears="hist-customer-input" aria-label="Clear">&times;</button>
+          <div id="hist-customer-list" class="combo-list hidden"></div>
+        </div>
+      </div>
+      <div class="form-row" style="min-width:200px;">
+        <label data-i18n="item_filter_label">Item description</label>
+        <div class="combo clearable">
+          <input id="hist-item" type="text" autocomplete="off" data-i18n-placeholder="all_items_placeholder" placeholder="All items (e.g. Abono, bota)">
+          <button type="button" class="clear-btn" data-clears="hist-item" aria-label="Clear">&times;</button>
+          <div id="hist-item-list" class="combo-list hidden"></div>
+        </div>
+      </div>
+    </div>
+    <button class="secondary" id="hist-clear" data-i18n="clear_filters">Clear filters</button>
+
+    <div class="history-tabs-row">
+      <div class="history-tabs">
+        <button id="hist-tab-entries" class="active" data-i18n="tab_entries">Entries</button>
+        <button id="hist-tab-items" data-i18n="tab_by_item">Totals by item</button>
+      </div>
+      <select id="hist-sort" class="secondary">
+        <option value="added" data-i18n="sort_added">Order Added</option>
+        <option value="recent" data-i18n="sort_recent">Recently Added First</option>
+        <option value="deposit" data-i18n="sort_deposit">Deposit Amount</option>
+        <option value="withdrawal" data-i18n="sort_withdrawal">Withdrawal Amount</option>
+        <option value="customer" data-i18n="sort_customer">Customer Name</option>
+      </select>
+    </div>
 
     <div id="historyTotals" class="history-totals hidden">
       <div class="stat"><span data-i18n="total_deposited">Total Deposited</span><b id="hist-total-deposit">$0.00</b></div>
@@ -440,6 +608,22 @@
     </div>
     <div id="historyResults"></div>
     <div id="historyEmptyState" class="empty-state hidden" data-i18n="no_activity">No activity in this range.</div>
+    <div id="historyPager" class="history-pager hidden">
+      <label><span data-i18n="show_label">Show</span>
+        <select id="hist-page-size" class="secondary">
+          <option value="20">20</option>
+          <option value="30">30</option>
+          <option value="50">50</option>
+          <option value="100">100</option>
+          <option value="all" data-i18n="show_all">All</option>
+        </select>
+      </label>
+      <span class="pagination">
+        <button class="secondary" id="hist-prev">&laquo; <span data-i18n="prev">Prev</span></button>
+        <span id="hist-page-label"></span>
+        <button class="secondary" id="hist-next"><span data-i18n="next">Next</span> &raquo;</button>
+      </span>
+    </div>
 
     <div class="dialog-actions">
       <button class="secondary" id="history-close" data-i18n="close">Close</button>
@@ -475,14 +659,47 @@ const TRANSLATIONS = {
     custom_description: "Type description...",
     balance_auto_note: "Total balance is calculated automatically from deposits and withdrawals.",
     manage_backups_title: "Manage Backups",
-    backups_explainer: "A backup is taken automatically on launch and every 30 minutes. Restoring overwrites your current data with the chosen backup \u2014 a safety backup of what you had is taken first, so restoring is itself reversible.",
+    backups_explainer: "While the app is open, a backup is taken every hour from 10:30 AM to 7:00 PM (only if something changed). At the end of each day its backups are combined into one, unless a restore was done that day. Restoring overwrites your current data with the chosen backup \u2014 a safety backup of what you had is taken first, so restoring is itself reversible.",
     no_backups: "No backups yet.", close: "Close",
+    backup_done: "Backup created.", before_restore: "Before restore",
     history_title: "History of Activity", preset_today: "Today", preset_week: "1 Week",
     preset_month: "1 Month", preset_year: "1 Year", from_label: "From", to_label: "To",
-    customer_filter_label: "Customer", all_customers: "All Customers", run_search: "Show Activity",
+    from_time_label: "From time", to_time_label: "To time",
+    customer_filter_label: "Customer", all_customers: "All Customers",
+    customer_search_placeholder: "All customers (type to search)",
+    no_customer_matches: "No matching customers",
+    item_filter_label: "Item description", all_items_placeholder: "All items (e.g. Abono, bota)",
+    clear_filters: "Clear filters", tab_entries: "Entries", tab_by_item: "Totals by item",
     total_deposited: "Total Deposited", total_withdrawn: "Total Withdrawn", net: "Net",
-    entry_count: "Entries", no_activity: "No activity in this range.",
+    entry_count: "Entries", no_activity: "No activity matches these filters.",
+    no_matches: "No customers match your search.",
+    starting_balance: "Starting balance",
+    opening_balance_label: "Existing balance (optional)",
+    opening_balance_hint: "For cards moving over from the old system. New items add on top of this balance.",
     edit: "Edit", save: "Save", delete: "Delete", restore: "Restore",
+    before_date_fix: "Before date fix", review: "Review", dismiss: "Dismiss",
+    check_dates: "Check for wrong dates",
+    date_fix_banner: "{n} item(s) or card(s) may have the wrong date (saved after 5 PM by an older version).",
+    date_fix_title: "Fix Wrong Dates",
+    date_fix_explainer: "An older version of this app saved items added after 5 PM (4 PM in winter) with the next day's date. The items below match that mistake exactly. A backup is taken before anything changes. Uncheck any you want to leave as they are.",
+    date_fix_none: "No wrong dates found.",
+    date_fix_entries_heading: "Items with the wrong date",
+    date_fix_customers_heading: "Cards that might have the wrong \"Date created\"",
+    date_fix_customers_hint: "These cards were made late in the day by an older version, so their date may be one day ahead. Cards marked \"confirmed\" had an item added before the card's own date and time, which is only possible if that date is wrong, so they are ticked. The rest can't be checked automatically (the date may have been typed on purpose, e.g. for cards moved from paper); compare those with the paper card. New cards are never listed.",
+    date_fix_now: "Now", date_fix_will_be: "Will be",
+    date_fix_apply: "Fix selected dates",
+    date_fix_confirm: "Change the date on {n} item(s)/card(s)? A backup is taken first, so this can be undone from Manage Backups.",
+    date_fix_done: "Fixed {e} item(s) and {c} card(s). A backup from just before the fix is in Manage Backups.",
+    date_fix_nothing_selected: "Nothing is selected.",
+    date_fix_why: "Why it's listed",
+    date_fix_reason_confirmed: "Confirmed: an item was added before this date",
+    date_fix_reason_unsure: "Can't tell: check the paper card",
+    sort_withdrawal: "Withdrawal Amount",
+    sort_customer: "Customer Name",
+    show_label: "Show",
+    show_all: "All",
+    page_of: "Page {p} of {n} ({count} entries)",
+    carried_over: "Balance carried over",
   },
   es: {
     app_title: "TARJETAS", search: "Buscar", clear: "Limpiar",
@@ -504,14 +721,47 @@ const TRANSLATIONS = {
     custom_description: "Escriba la descripción...",
     balance_auto_note: "El saldo total se calcula automáticamente según los abonos y retiros.",
     manage_backups_title: "Administrar Respaldos",
-    backups_explainer: "Se hace un respaldo automáticamente al abrir la app y cada 30 minutos. Restaurar reemplaza los datos actuales con el respaldo elegido \u2014 primero se guarda un respaldo de seguridad, así que restaurar también se puede deshacer.",
+    backups_explainer: "Mientras la app está abierta, se hace un respaldo cada hora de 10:30 AM a 7:00 PM (solo si hubo cambios). Al final de cada día sus respaldos se combinan en uno, a menos que ese día se haya restaurado. Restaurar reemplaza los datos actuales con el respaldo elegido \u2014 primero se guarda un respaldo de seguridad, así que restaurar también se puede deshacer.",
     no_backups: "Aún no hay respaldos.", close: "Cerrar",
+    backup_done: "Respaldo creado.", before_restore: "Antes de restaurar",
     history_title: "Historial de Actividad", preset_today: "Hoy", preset_week: "1 Semana",
     preset_month: "1 Mes", preset_year: "1 Año", from_label: "Desde", to_label: "Hasta",
-    customer_filter_label: "Cliente", all_customers: "Todos los Clientes", run_search: "Mostrar Actividad",
+    from_time_label: "Desde la hora", to_time_label: "Hasta la hora",
+    customer_filter_label: "Cliente", all_customers: "Todos los Clientes",
+    customer_search_placeholder: "Todos los clientes (escriba para buscar)",
+    no_customer_matches: "Ningún cliente coincide",
+    item_filter_label: "Descripción del artículo", all_items_placeholder: "Todos los artículos (ej. Abono, bota)",
+    clear_filters: "Limpiar filtros", tab_entries: "Entradas", tab_by_item: "Totales por artículo",
     total_deposited: "Total Abonado", total_withdrawn: "Total Retirado", net: "Neto",
-    entry_count: "Entradas", no_activity: "No hay actividad en este rango.",
+    entry_count: "Entradas", no_activity: "No hay actividad con estos filtros.",
+    no_matches: "Ningún cliente coincide con su búsqueda.",
+    starting_balance: "Saldo inicial",
+    opening_balance_label: "Saldo existente (opcional)",
+    opening_balance_hint: "Para tarjetas que vienen del sistema anterior. Los artículos nuevos se suman a este saldo.",
     edit: "Editar", save: "Guardar", delete: "Eliminar", restore: "Restaurar",
+    before_date_fix: "Antes de corregir fechas", review: "Revisar", dismiss: "Ocultar",
+    check_dates: "Buscar fechas incorrectas",
+    date_fix_banner: "{n} artículo(s) o tarjeta(s) pueden tener la fecha incorrecta (guardados después de las 5 PM por una versión anterior).",
+    date_fix_title: "Corregir Fechas Incorrectas",
+    date_fix_explainer: "Una versión anterior de esta app guardaba los artículos agregados después de las 5 PM (4 PM en invierno) con la fecha del día siguiente. Los artículos de abajo coinciden exactamente con ese error. Se hace un respaldo antes de cambiar algo. Desmarque los que quiera dejar como están.",
+    date_fix_none: "No se encontraron fechas incorrectas.",
+    date_fix_entries_heading: "Artículos con la fecha incorrecta",
+    date_fix_customers_heading: "Tarjetas que podrían tener la \"Fecha de creación\" incorrecta",
+    date_fix_customers_hint: "Estas tarjetas se crearon tarde en el día con una versión anterior, así que su fecha podría estar un día adelantada. Las marcadas \"confirmado\" tienen un artículo agregado antes de la fecha y hora de la propia tarjeta, lo cual solo es posible si esa fecha está mal, por eso están marcadas. Las demás no se pueden comprobar automáticamente (la fecha pudo escribirse a propósito, p. ej. en tarjetas pasadas del papel); compárelas con la tarjeta de papel. Las tarjetas nuevas nunca aparecen aquí.",
+    date_fix_now: "Ahora", date_fix_will_be: "Quedará",
+    date_fix_apply: "Corregir fechas marcadas",
+    date_fix_confirm: "¿Cambiar la fecha de {n} artículo(s)/tarjeta(s)? Primero se hace un respaldo, así que se puede deshacer desde Administrar Respaldos.",
+    date_fix_done: "Se corrigieron {e} artículo(s) y {c} tarjeta(s). En Administrar Respaldos hay un respaldo de justo antes de la corrección.",
+    date_fix_nothing_selected: "No hay nada marcado.",
+    date_fix_why: "Por qué aparece",
+    date_fix_reason_confirmed: "Confirmado: se agregó un artículo antes de esta fecha",
+    date_fix_reason_unsure: "No se sabe: revise la tarjeta de papel",
+    sort_withdrawal: "Monto de Retiro",
+    sort_customer: "Nombre del Cliente",
+    show_label: "Mostrar",
+    show_all: "Todos",
+    page_of: "Página {p} de {n} ({count} entradas)",
+    carried_over: "Saldo anterior",
   }
 };
 
@@ -540,6 +790,7 @@ function applyTranslations() {
   });
   document.getElementById("langToggleBtn").textContent = getGlobalLanguage() === "en" ? "ES" : "EN";
   document.title = t("app_title");
+  if (typeof updateDateFixBannerText === "function") updateDateFixBannerText();
 }
 
 document.getElementById("langToggleBtn").onclick = () => {
@@ -551,6 +802,11 @@ document.getElementById("langToggleBtn").onclick = () => {
 function fmtMoney(v) {
   if (v === null || v === undefined || v === "") return "0.00";
   return Number(v).toFixed(2);
+}
+// "$12.50" / "-$12.50" for totals.
+function fmtDollars(v) {
+  const n = Number(v) || 0;
+  return (n < 0 ? "-$" : "$") + fmtMoney(Math.abs(n));
 }
 
 async function api(path, options = {}) {
@@ -565,6 +821,44 @@ async function api(path, options = {}) {
   }
   if (res.status === 204) return null;
   return res.json();
+}
+
+// Today's date (or any Date) as yyyy-mm-dd in the computer's LOCAL time.
+// Don't use toISOString() for this: it's UTC, so in California it rolls
+// over to tomorrow at 5 PM (4 PM in winter) and stamps the wrong date.
+function localIsoDate(d = new Date()) {
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+// Shared customer matcher for the main search and the History customer
+// picker. Every word typed must match the name, or (for digits) the phone,
+// so "john to" finds "John Torres" and "959 55" finds "(510)-959-5506".
+// Lowercase and drop accents, so "jose" finds "José" and "gonzalez" finds "González".
+function foldText(s) {
+  return (s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+}
+
+function customerMatches(c, query) {
+  query = foldText(query.trim());
+  if (!query) return true;
+  const name = foldText(c.name);
+  const phoneDigits = (c.phone_number || "").replace(/\D/g, "");
+  // Only digits and phone punctuation: match it as one phone number.
+  if (/^[\d\s()+\-.]+$/.test(query)) {
+    return phoneDigits.includes(query.replace(/\D/g, ""));
+  }
+  return query.split(/\s+/).every(w =>
+    name.includes(w) || (/^\d+$/.test(w) && phoneDigits.includes(w))
+  );
+}
+
+function debounce(fn, ms) {
+  let timer = null;
+  return (...args) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), ms);
+  };
 }
 
 function escapeHtml(s) {
@@ -592,31 +886,37 @@ function formatPhoneInput(inputEl) {
 formatPhoneInput(document.getElementById("nc-phone"));
 
 // ===================== List view =====================
-async function loadCustomerList(q = "") {
-  const params = q ? `?q=${encodeURIComponent(q)}` : "";
-  const customers = await api(`/customers${params}`);
-  const list = document.getElementById("customerList");
-  const empty = document.getElementById("listEmptyState");
-  list.innerHTML = "";
-  if (customers.length === 0) {
-    empty.classList.remove("hidden");
-  } else {
-    empty.classList.add("hidden");
-    for (const c of customers) {
-      const tile = document.createElement("div");
-      tile.className = "customer-tile";
-      tile.innerHTML = `<div class="name">${escapeHtml(c.name)}</div><div class="phone">${escapeHtml(c.phone_number)}</div>`;
-      tile.onclick = () => openCard(c.id);
-      list.appendChild(tile);
-    }
-  }
-  return customers;
+// All customers are loaded once and filtered in the browser as you type;
+// a few hundred customers is tiny, so this keeps search instant.
+let allCustomers = [];
+
+async function refreshCustomers() {
+  allCustomers = await api("/customers");
+  return allCustomers;
 }
 
-document.getElementById("clearSearchBtn").onclick = () => {
-  document.getElementById("searchInput").value = "";
-  loadCustomerList();
-};
+function renderCustomerList() {
+  const q = document.getElementById("searchInput").value.trim();
+  const list = document.getElementById("customerList");
+  const empty = document.getElementById("listEmptyState");
+  const noMatch = document.getElementById("listNoMatchState");
+  const shown = allCustomers.filter(c => customerMatches(c, q));
+  list.innerHTML = "";
+  empty.classList.toggle("hidden", allCustomers.length !== 0);
+  noMatch.classList.toggle("hidden", allCustomers.length === 0 || shown.length !== 0);
+  for (const c of shown) {
+    const tile = document.createElement("div");
+    tile.className = "customer-tile";
+    tile.innerHTML = `<div class="name">${escapeHtml(c.name)}</div><div class="phone">${escapeHtml(c.phone_number)}</div>`;
+    tile.onclick = () => openCard(c.id);
+    list.appendChild(tile);
+  }
+}
+
+async function loadCustomerList() {
+  await refreshCustomers();
+  renderCustomerList();
+}
 
 // ===================== Card view =====================
 async function openCard(customerId, page = 1, sort = null) {
@@ -635,6 +935,7 @@ async function openCard(customerId, page = 1, sort = null) {
   document.getElementById("fld-phone").textContent = data.phone_number;
   document.getElementById("fld-address").textContent = data.address || "";
   document.getElementById("fld-date_created").textContent = data.date_created;
+  document.getElementById("fld-opening_balance").textContent = fmtMoney(data.opening_balance);
 
   document.getElementById("pageLabel").textContent =
     `Page ${data.page} of ${data.total_pages} (${data.total_entries} items)`;
@@ -642,10 +943,33 @@ async function openCard(customerId, page = 1, sort = null) {
 
   const tbody = document.getElementById("entryRows");
   tbody.innerHTML = "";
+  // A balance carried over from paper shows as the card's first line, like
+  // on the paper card. It's display-only: not an entry, not a deposit, so it
+  // never counts toward History totals.
+  const carried = data.opening_balance ? buildCarriedOverRow(data) : null;
+  const showCarriedFirst = carried && currentSort === "added" && data.page === 1;
+  const showCarriedLast = carried && currentSort === "recent" && data.page === data.total_pages;
+  if (showCarriedFirst) tbody.appendChild(carried);
   for (const e of data.entries) {
     tbody.appendChild(buildEntryRow(e));
   }
+  if (showCarriedLast) tbody.appendChild(carried);
   applyTranslations();
+}
+
+function buildCarriedOverRow(data) {
+  const tr = document.createElement("tr");
+  tr.className = "carried-over";
+  tr.innerHTML = `
+    <td>${escapeHtml(data.date_created)}</td>
+    <td></td>
+    <td data-i18n="carried_over">${escapeHtml(t("carried_over"))}</td>
+    <td class="num"></td>
+    <td class="num"></td>
+    <td class="num">${fmtMoney(data.opening_balance)}</td>
+    <td></td>
+  `;
+  return tr;
 }
 
 // Shared item-description preset list, used by both the Add Item dialog
@@ -793,12 +1117,24 @@ document.querySelectorAll("#cardView .card-header .editable").forEach(el => {
     el.contentEditable = "false";
     const field = el.dataset.field;
     let value = el.textContent.trim();
+    if (field === "opening_balance") {
+      // Accept "$1,250.00" style input. Changing it doesn't rewrite existing
+      // balances; it takes effect the next time an item is added.
+      value = value.replace(/[$,\s]/g, "");
+      if (value !== "" && isNaN(Number(value))) {
+        alert("Starting balance must be a number.");
+        openCard(currentCustomerId, currentPage, currentSort);
+        return;
+      }
+    }
     try {
       const updated = await api(`/customers/${currentCustomerId}`, {
         method: "PUT",
         body: JSON.stringify({ [field]: value }),
       });
-      el.textContent = updated[field] ?? "";
+      el.textContent = field === "opening_balance"
+        ? fmtMoney(updated[field])
+        : (updated[field] ?? "");
     } catch (e) {
       openCard(currentCustomerId, currentPage, currentSort);
     }
@@ -828,11 +1164,19 @@ document.getElementById("nextPageBtn").onclick = () => {
 };
 
 // ===================== Search =====================
-document.getElementById("searchBtn").onclick = () => {
-  loadCustomerList(document.getElementById("searchInput").value.trim());
-};
+// Filters as you type. If a card is open, typing jumps back to the list.
+document.getElementById("searchInput").addEventListener("input", () => {
+  if (!document.getElementById("cardView").classList.contains("hidden")) {
+    document.getElementById("backBtn").click();
+    return;
+  }
+  renderCustomerList();
+});
 document.getElementById("searchInput").addEventListener("keydown", (e) => {
-  if (e.key === "Enter") loadCustomerList(e.target.value.trim());
+  // Enter opens the customer when the search narrows it down to one.
+  if (e.key !== "Enter") return;
+  const matches = allCustomers.filter(c => customerMatches(c, e.target.value.trim()));
+  if (matches.length === 1) openCard(matches[0].id);
 });
 
 // ===================== New customer dialog =====================
@@ -841,7 +1185,8 @@ document.getElementById("newCustomerBtn").onclick = () => {
   document.getElementById("nc-name").value = "";
   document.getElementById("nc-phone").value = "";
   document.getElementById("nc-address").value = "";
-  document.getElementById("nc-date").value = new Date().toISOString().slice(0, 10);
+  document.getElementById("nc-date").value = localIsoDate();
+  document.getElementById("nc-opening").value = "";
   newCustomerDialog.showModal();
 };
 document.getElementById("nc-cancel").onclick = () => newCustomerDialog.close();
@@ -851,6 +1196,7 @@ document.getElementById("nc-save").onclick = async () => {
     phone_number: document.getElementById("nc-phone").value.trim(),
     address: document.getElementById("nc-address").value.trim(),
     date_created: document.getElementById("nc-date").value,
+    opening_balance: parseFloat(document.getElementById("nc-opening").value) || 0,
   };
   if (!payload.name || !payload.phone_number || !payload.date_created) {
     alert("Name, phone number, and date created are required.");
@@ -876,7 +1222,7 @@ neDescSelect.onchange = () => {
 };
 
 document.getElementById("addEntryBtn").onclick = () => {
-  document.getElementById("ne-date").value = new Date().toISOString().slice(0, 10);
+  document.getElementById("ne-date").value = localIsoDate();
   populateAddItemDescriptionOptions();
   neDescSelect.value = "Abono";
   neDescCustom.value = "";
@@ -934,7 +1280,9 @@ async function loadBackupsList() {
     row.innerHTML = `
       <div class="backup-info">
         <div class="when">${fmtWhen(b.created)}</div>
-        <div class="size">${fmtBytes(b.size_bytes)}</div>
+        <div class="size">${fmtBytes(b.size_bytes)}${
+          b.kind === "pre_restore" ? " · " + escapeHtml(t("before_restore"))
+          : b.kind === "pre_date_fix" ? " · " + escapeHtml(t("before_date_fix")) : ""}</div>
       </div>
       <div class="backup-actions">
         <button class="secondary restore-btn" data-i18n="restore">Restore</button>
@@ -971,71 +1319,290 @@ document.getElementById("manageBackupsBtn").onclick = async () => {
   backupsDialog.showModal();
 };
 document.getElementById("backups-close").onclick = () => backupsDialog.close();
+document.getElementById("backupNowBtn").onclick = async () => {
+  await api("/backup", { method: "POST" });
+  await loadBackupsList();
+  alert(t("backup_done"));
+};
 
 // ===================== History =====================
+// Every filter (dates, times, customer, item) applies together, and the
+// results refresh automatically whenever any of them changes. Sorting and
+// paging happen in the browser on the full result the server returns.
 const historyDialog = document.getElementById("historyDialog");
 const histStart = document.getElementById("hist-start");
 const histEnd = document.getElementById("hist-end");
-const histCustomerSelect = document.getElementById("hist-customer");
+const histStartTime = document.getElementById("hist-start-time");
+const histEndTime = document.getElementById("hist-end-time");
+const histCustomerInput = document.getElementById("hist-customer-input");
+const histCustomerList = document.getElementById("hist-customer-list");
+const histItem = document.getElementById("hist-item");
+const histItemList = document.getElementById("hist-item-list");
+const histSortSelect = document.getElementById("hist-sort");
+const histPageSizeSelect = document.getElementById("hist-page-size");
+let histSelectedCustomer = null;   // {id, name} once picked from the list
+let histView = "entries";          // "entries" or "items"
+let histLastData = null;
+let histRequestSeq = 0;            // ignore responses that arrive out of order
+let histPage = 1;
+let histSort = "added";            // earliest first, like a card's "Order Added"
+let histPreset = "today";
+let knownItems = [...ITEM_OPTIONS];
 
-function isoToday() {
-  return new Date().toISOString().slice(0, 10);
+// Per-computer conveniences; the app works the same if storage is unavailable.
+function readPref(key, fallback) {
+  try { return localStorage.getItem(key) || fallback; } catch (e) { return fallback; }
 }
+function writePref(key, value) {
+  try { localStorage.setItem(key, value); } catch (e) {}
+}
+let histPageSize = readPref("tarjetas_hist_page_size", "30");
+
 function isoDaysAgo(days) {
   const d = new Date();
   d.setDate(d.getDate() - days);
-  return d.toISOString().slice(0, 10);
+  return localIsoDate(d);
 }
 function isoMonthsAgo(months) {
   const d = new Date();
   d.setMonth(d.getMonth() - months);
-  return d.toISOString().slice(0, 10);
+  return localIsoDate(d);
 }
 function isoYearsAgo(years) {
   const d = new Date();
   d.setFullYear(d.getFullYear() - years);
-  return d.toISOString().slice(0, 10);
+  return localIsoDate(d);
 }
 
-async function populateHistoryCustomerDropdown() {
-  const customers = await api("/customers");
-  const current = histCustomerSelect.value;
-  histCustomerSelect.innerHTML = `<option value="" data-i18n="all_customers">${t("all_customers")}</option>`;
-  for (const c of customers) {
-    const opt = document.createElement("option");
-    opt.value = c.id;
-    opt.textContent = c.name;
-    histCustomerSelect.appendChild(opt);
+// ---------- Type-to-filter dropdown (customer and item pickers) ----------
+function setupCombo({ input, list, getOptions, renderOption, onPick, onType, emptyText }) {
+  let active = -1;
+  let shown = [];
+
+  function render() {
+    shown = getOptions(input.value).slice(0, 50);
+    active = Math.min(active, shown.length - 1);
+    if (!shown.length) {
+      list.innerHTML = emptyText ? `<div class="combo-empty">${escapeHtml(emptyText())}</div>` : "";
+      list.classList.toggle("hidden", !emptyText);
+      return;
+    }
+    list.innerHTML = shown.map((o, i) =>
+      `<div class="combo-option${i === active ? " active" : ""}" data-i="${i}">${renderOption(o)}</div>`
+    ).join("");
+    list.classList.remove("hidden");
   }
-  histCustomerSelect.value = current || "";
+  function hide() {
+    list.classList.add("hidden");
+    active = -1;
+  }
+  function pick(i) {
+    const option = shown[i];
+    if (option === undefined) return;
+    hide();
+    onPick(option);
+  }
+
+  input.addEventListener("input", () => { active = -1; render(); onType(); });
+  input.addEventListener("focus", render);
+  input.addEventListener("blur", () => setTimeout(hide, 150));  // let option clicks land first
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      if (list.classList.contains("hidden")) render();
+      if (!shown.length) return;
+      active = e.key === "ArrowDown"
+        ? (active + 1) % shown.length
+        : (active - 1 + shown.length) % shown.length;
+      render();
+      const el = list.querySelector(".combo-option.active");
+      if (el) el.scrollIntoView({ block: "nearest" });
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (!list.classList.contains("hidden")) pick(active >= 0 ? active : 0);
+    } else if (e.key === "Escape" && !list.classList.contains("hidden")) {
+      e.preventDefault();  // close just the list, not the whole dialog
+      hide();
+    }
+  });
+  list.addEventListener("mousedown", (e) => {
+    const opt = e.target.closest(".combo-option");
+    if (!opt) return;
+    e.preventDefault();
+    pick(Number(opt.dataset.i));
+  });
+  return { hide };
 }
 
-async function runHistorySearch() {
-  const params = new URLSearchParams({ start: histStart.value, end: histEnd.value });
-  if (histCustomerSelect.value) params.set("customer_id", histCustomerSelect.value);
-  const data = await api(`/history?${params.toString()}`);
+function histCustomerMatches() {
+  return allCustomers.filter(c => customerMatches(c, histCustomerInput.value));
+}
 
+setupCombo({
+  input: histCustomerInput,
+  list: histCustomerList,
+  getOptions: () => histCustomerMatches(),
+  renderOption: (c) => `${escapeHtml(c.name)}<span class="phone">${escapeHtml(c.phone_number)}</span>`,
+  onPick: (c) => {
+    histSelectedCustomer = { id: c.id, name: c.name };
+    histCustomerInput.value = c.name;
+    histPage = 1;
+    runHistorySearch();
+  },
+  // Typing again means "searching", not the previously picked person.
+  onType: () => { histSelectedCustomer = null; histPage = 1; runHistorySearchDebounced(); },
+  emptyText: () => t("no_customer_matches"),
+});
+
+// Item picker: the known items as a list, but any text can be typed too
+// (it matches any description containing it, e.g. "bota").
+setupCombo({
+  input: histItem,
+  list: histItemList,
+  getOptions: (q) => {
+    const f = foldText(q.trim());
+    return knownItems.filter(item => foldText(item).includes(f));
+  },
+  renderOption: (item) => escapeHtml(item),
+  onPick: (item) => { histItem.value = item; histPage = 1; runHistorySearch(); },
+  onType: () => { histPage = 1; runHistorySearchDebounced(); },
+  emptyText: null,
+});
+
+async function loadKnownItems() {
+  let used = [];
+  try { used = await api("/item-descriptions"); } catch (e) { /* suggestions are optional */ }
+  const seen = new Map();
+  for (const d of [...ITEM_OPTIONS, ...used]) {
+    if (!seen.has(foldText(d))) seen.set(foldText(d), d);
+  }
+  knownItems = [...seen.values()];
+}
+
+// ---------- Search ----------
+async function runHistorySearch() {
+  if (!histStart.value || !histEnd.value) return;
+  const params = new URLSearchParams({ start: histStart.value, end: histEnd.value });
+
+  if (histSelectedCustomer) {
+    params.set("customer_ids", String(histSelectedCustomer.id));
+  } else if (histCustomerInput.value.trim()) {
+    // Not picked yet: show activity for everyone the search matches.
+    params.set("customer_ids", histCustomerMatches().map(c => c.id).join(","));
+  }
+  if (histItem.value.trim()) params.set("item", histItem.value.trim());
+  if (histStartTime.value) params.set("start_time", histStartTime.value);
+  if (histEndTime.value) params.set("end_time", histEndTime.value);
+
+  const seq = ++histRequestSeq;
+  const data = await api(`/history?${params.toString()}`);
+  if (seq !== histRequestSeq) return;  // a newer search already started
+  histLastData = data;
+  renderHistory();
+}
+const runHistorySearchDebounced = debounce(runHistorySearch, 250);
+
+// ---------- Sorting ----------
+function dateSortKey(s) {
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(s || "");
+  return m ? `${m[3]}${m[1]}${m[2]}` : "";
+}
+function timeSortKey(s) {
+  const m = /^(\d{1,2}):(\d{2})\s*([AP]M)$/i.exec((s || "").trim());
+  if (!m) return -1;
+  let h = Number(m[1]) % 12;
+  if (m[3].toUpperCase() === "PM") h += 12;
+  return h * 60 + Number(m[2]);
+}
+function chronological(a, b) {
+  return dateSortKey(a.date).localeCompare(dateSortKey(b.date))
+    || timeSortKey(a.time) - timeSortKey(b.time)
+    || a.entry_id - b.entry_id;
+}
+function sortHistoryEntries(entries) {
+  const arr = [...entries];
+  switch (histSort) {
+    case "recent":
+      return arr.sort((a, b) => chronological(b, a));
+    case "deposit":
+      return arr.sort((a, b) => (b.deposit || 0) - (a.deposit || 0) || chronological(a, b));
+    case "withdrawal":
+      return arr.sort((a, b) => (b.withdrawal || 0) - (a.withdrawal || 0) || chronological(a, b));
+    case "customer":
+      return arr.sort((a, b) =>
+        a.customer_name.localeCompare(b.customer_name, undefined, { sensitivity: "base" })
+        || chronological(a, b));
+    default:
+      return arr.sort(chronological);
+  }
+}
+
+// ---------- Rendering ----------
+function renderHistory() {
+  const data = histLastData;
   const totalsEl = document.getElementById("historyTotals");
   const resultsEl = document.getElementById("historyResults");
   const emptyEl = document.getElementById("historyEmptyState");
+  const pagerEl = document.getElementById("historyPager");
+  histSortSelect.classList.toggle("hidden", histView !== "entries");
+  if (!data) return;
 
   if (data.count === 0) {
     totalsEl.classList.add("hidden");
+    pagerEl.classList.add("hidden");
     resultsEl.innerHTML = "";
     emptyEl.classList.remove("hidden");
     return;
   }
   emptyEl.classList.add("hidden");
   totalsEl.classList.remove("hidden");
-  document.getElementById("hist-total-deposit").textContent = "$" + fmtMoney(data.total_deposit);
-  document.getElementById("hist-total-withdrawal").textContent = "$" + fmtMoney(data.total_withdrawal);
-  document.getElementById("hist-total-net").textContent = "$" + fmtMoney(data.net);
+  document.getElementById("hist-total-deposit").textContent = fmtDollars(data.total_deposit);
+  document.getElementById("hist-total-withdrawal").textContent = fmtDollars(data.total_withdrawal);
+  document.getElementById("hist-total-net").textContent = fmtDollars(data.net);
   document.getElementById("hist-count").textContent = data.count;
 
-  const rows = data.entries.map(e => `
+  if (histView === "items") {
+    pagerEl.classList.add("hidden");
+    const rows = data.by_item.map(g => `
+      <tr class="clickable" data-item="${escapeHtml(g.item_description)}">
+        <td>${escapeHtml(g.item_description || "—")}</td>
+        <td class="num deposit-cell">${fmtMoney(g.total_deposit)}</td>
+        <td class="num withdrawal-cell">${fmtMoney(g.total_withdrawal)}</td>
+        <td class="num">${fmtMoney(g.net)}</td>
+        <td class="num">${g.count}</td>
+      </tr>`).join("");
+    resultsEl.innerHTML = `
+      <table class="history-table">
+        <thead><tr>
+          <th>${escapeHtml(t("item_description"))}</th>
+          <th class="num">${escapeHtml(t("total_deposited"))}</th>
+          <th class="num">${escapeHtml(t("total_withdrawn"))}</th>
+          <th class="num">${escapeHtml(t("net"))}</th>
+          <th class="num">${escapeHtml(t("entry_count"))}</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+    // Clicking an item narrows everything (totals included) to that item.
+    resultsEl.querySelectorAll("tr.clickable").forEach(tr => {
+      tr.onclick = () => {
+        histItem.value = tr.dataset.item;
+        histPage = 1;
+        runHistorySearch();
+      };
+    });
+    return;
+  }
+
+  const sorted = sortHistoryEntries(data.entries);
+  const size = histPageSize === "all" ? Math.max(sorted.length, 1) : Number(histPageSize);
+  const pages = Math.max(1, Math.ceil(sorted.length / size));
+  histPage = Math.min(Math.max(histPage, 1), pages);
+  const pageRows = sorted.slice((histPage - 1) * size, histPage * size);
+
+  const rows = pageRows.map(e => `
     <tr>
-      <td>${escapeHtml(e.date)}</td>
-      <td>${escapeHtml(e.time || "")}</td>
+      <td class="nowrap">${escapeHtml(e.date)}</td>
+      <td class="nowrap">${escapeHtml(e.time || "")}</td>
       <td>${escapeHtml(e.customer_name)}</td>
       <td>${escapeHtml(e.item_description)}</td>
       <td class="num deposit-cell">${fmtMoney(e.deposit)}</td>
@@ -1045,43 +1612,263 @@ async function runHistorySearch() {
   resultsEl.innerHTML = `
     <table class="history-table">
       <thead><tr>
-        <th data-i18n="date">Date</th><th data-i18n="time_col">Time</th><th>${t("customer_filter_label")}</th>
-        <th data-i18n="item_description">Item Description</th>
-        <th class="num" data-i18n="deposit">Deposit</th>
-        <th class="num" data-i18n="withdrawal">Withdrawal</th>
+        <th>${escapeHtml(t("date"))}</th><th>${escapeHtml(t("time_col"))}</th>
+        <th>${escapeHtml(t("customer_filter_label"))}</th>
+        <th>${escapeHtml(t("item_description"))}</th>
+        <th class="num">${escapeHtml(t("deposit"))}</th>
+        <th class="num">${escapeHtml(t("withdrawal"))}</th>
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>
   `;
+  resultsEl.scrollTop = 0;
+
+  pagerEl.classList.remove("hidden");
+  histPageSizeSelect.value = histPageSize;
+  document.getElementById("hist-page-label").textContent = t("page_of")
+    .replace("{p}", histPage).replace("{n}", pages).replace("{count}", sorted.length);
+  document.getElementById("hist-prev").disabled = histPage <= 1;
+  document.getElementById("hist-next").disabled = histPage >= pages;
 }
 
-function setHistoryRangeAndRun(startIso) {
-  histStart.value = startIso;
-  histEnd.value = isoToday();
-  runHistorySearch();
+function setHistView(view) {
+  histView = view;
+  document.getElementById("hist-tab-entries").classList.toggle("active", view === "entries");
+  document.getElementById("hist-tab-items").classList.toggle("active", view === "items");
+  renderHistory();
 }
-document.getElementById("hist-today").onclick = () => setHistoryRangeAndRun(isoToday());
-document.getElementById("hist-week").onclick = () => setHistoryRangeAndRun(isoDaysAgo(7));
-document.getElementById("hist-month").onclick = () => setHistoryRangeAndRun(isoMonthsAgo(1));
-document.getElementById("hist-year").onclick = () => setHistoryRangeAndRun(isoYearsAgo(1));
-document.getElementById("hist-run").onclick = runHistorySearch;
+document.getElementById("hist-tab-entries").onclick = () => setHistView("entries");
+document.getElementById("hist-tab-items").onclick = () => setHistView("items");
+
+histSortSelect.onchange = () => {
+  histSort = histSortSelect.value;
+  histPage = 1;
+  renderHistory();
+};
+histPageSizeSelect.onchange = () => {
+  histPageSize = histPageSizeSelect.value;
+  writePref("tarjetas_hist_page_size", histPageSize);
+  histPage = 1;
+  renderHistory();
+};
+document.getElementById("hist-prev").onclick = () => { histPage--; renderHistory(); };
+document.getElementById("hist-next").onclick = () => { histPage++; renderHistory(); };
+
+// ---------- Date presets ----------
+const HIST_PRESETS = {
+  today: () => localIsoDate(),
+  week: () => isoDaysAgo(7),
+  month: () => isoMonthsAgo(1),
+  year: () => isoYearsAgo(1),
+};
+function markPreset(name) {
+  histPreset = name;
+  for (const key of Object.keys(HIST_PRESETS)) {
+    document.getElementById(`hist-${key}`).classList.toggle("active", key === name);
+  }
+}
+for (const [key, startFn] of Object.entries(HIST_PRESETS)) {
+  document.getElementById(`hist-${key}`).onclick = () => {
+    histStart.value = startFn();
+    histEnd.value = localIsoDate();
+    markPreset(key);
+    histPage = 1;
+    runHistorySearch();
+  };
+}
+
+[histStart, histEnd].forEach(el => el.addEventListener("change", () => {
+  markPreset(null);  // a hand-picked range is no longer a preset
+  histPage = 1;
+  runHistorySearch();
+}));
+[histStartTime, histEndTime].forEach(el => el.addEventListener("change", () => {
+  histPage = 1;
+  runHistorySearch();
+}));
+
+document.getElementById("hist-clear").onclick = () => {
+  histSelectedCustomer = null;
+  histCustomerInput.value = "";
+  histItem.value = "";
+  histStartTime.value = "";
+  histEndTime.value = "";
+  histPage = 1;
+  runHistorySearch();
+};
 
 document.getElementById("historyBtn").onclick = async () => {
-  await populateHistoryCustomerDropdown();
+  await refreshCustomers();
+  loadKnownItems();
   const cardOpen = currentCustomerId && !document.getElementById("cardView").classList.contains("hidden");
-  histCustomerSelect.value = cardOpen ? currentCustomerId : "";
-  histStart.value = isoToday();
-  histEnd.value = isoToday();
+  const current = cardOpen ? allCustomers.find(c => c.id === currentCustomerId) : null;
+  histSelectedCustomer = current ? { id: current.id, name: current.name } : null;
+  histCustomerInput.value = current ? current.name : "";
+  histItem.value = "";
+  histStartTime.value = "";
+  histEndTime.value = "";
+  histStart.value = localIsoDate();
+  histEnd.value = localIsoDate();
+  markPreset("today");
+  histPage = 1;
+  histSortSelect.value = histSort;
+  histLastData = null;
   document.getElementById("historyTotals").classList.add("hidden");
   document.getElementById("historyResults").innerHTML = "";
   document.getElementById("historyEmptyState").classList.add("hidden");
+  document.getElementById("historyPager").classList.add("hidden");
   historyDialog.showModal();
+  document.activeElement.blur();  // showModal focuses the first field; don't pop a list open
+  histCustomerList.classList.add("hidden");
+  histItemList.classList.add("hidden");
+  runHistorySearch();
 };
 document.getElementById("history-close").onclick = () => historyDialog.close();
+
+// ---------- Clear (x) buttons, for every .clearable input ----------
+document.querySelectorAll(".clear-btn").forEach(btn => {
+  btn.addEventListener("mousedown", (e) => e.preventDefault());  // don't steal focus
+  btn.onclick = () => {
+    const input = document.getElementById(btn.dataset.clears);
+    input.value = "";
+    input.dispatchEvent(new Event("input"));  // runs that field's normal "typed" logic
+    const list = btn.parentElement.querySelector(".combo-list");
+    if (list) list.classList.add("hidden");
+  };
+});
+
+// ===================== Fix wrong dates (old after-5 PM bug) =====================
+// The server finds the affected items; nothing changes until the user
+// confirms in the review window. Things the user chose to leave alone are
+// remembered on this computer so the notice doesn't keep coming back.
+// Keys look like "e:12" (entry 12) or "c:5" (card 5).
+const dateFixDialog = document.getElementById("dateFixDialog");
+const DATE_FIX_REVIEWED_KEY = "tarjetas_datefix_reviewed_v2";
+let dateFixData = { entries: [], customers: [] };
+let dateFixPendingCount = 0;
+
+function getReviewedKeys() {
+  try { return new Set(JSON.parse(localStorage.getItem(DATE_FIX_REVIEWED_KEY) || "[]")); }
+  catch (e) { return new Set(); }
+}
+function markReviewed(keys) {
+  const all = getReviewedKeys();
+  keys.forEach(k => all.add(k));
+  try { localStorage.setItem(DATE_FIX_REVIEWED_KEY, JSON.stringify([...all])); } catch (e) {}
+}
+// What the notice counts: every flagged entry, plus cards confirmed wrong.
+// "Can't tell" cards only show inside the review window.
+function dateFixNoticeKeys() {
+  return [
+    ...dateFixData.entries.map(e => `e:${e.entry_id}`),
+    ...dateFixData.customers.filter(c => c.confirmed).map(c => `c:${c.customer_id}`),
+  ];
+}
+
+async function checkShiftedDates() {
+  try { dateFixData = await api("/maintenance/shifted-dates"); }
+  catch (e) { return; }
+  const reviewed = getReviewedKeys();
+  dateFixPendingCount = dateFixNoticeKeys().filter(k => !reviewed.has(k)).length;
+  document.getElementById("dateFixBanner").classList.toggle("hidden", dateFixPendingCount === 0);
+  updateDateFixBannerText();
+}
+// Also called from applyTranslations() so the notice follows the language toggle.
+function updateDateFixBannerText() {
+  document.getElementById("dateFixBannerText").textContent =
+    t("date_fix_banner").replace("{n}", dateFixPendingCount);
+}
+
+function renderDateFixDialog() {
+  const { entries } = dateFixData;
+  // Confirmed cards first, then the ones that need a look at the paper card.
+  const customers = [...dateFixData.customers].sort((a, b) => Number(b.confirmed) - Number(a.confirmed));
+  const total = entries.length + customers.length;
+  document.getElementById("dateFixNone").classList.toggle("hidden", total > 0);
+  document.getElementById("dateFixEntriesSection").classList.toggle("hidden", entries.length === 0);
+  document.getElementById("dateFixCustomersSection").classList.toggle("hidden", customers.length === 0);
+  document.getElementById("dateFixApply").classList.toggle("hidden", total === 0);
+  document.getElementById("dateFixAllEntries").checked = true;
+  document.getElementById("dateFixAllCustomers").checked =
+    customers.length > 0 && customers.every(c => c.confirmed);
+
+  document.getElementById("dateFixEntryRows").innerHTML = entries.map(e => `
+    <tr>
+      <td><input type="checkbox" class="fix-entry" value="${e.entry_id}" checked></td>
+      <td>${escapeHtml(e.customer_name)}</td>
+      <td>${escapeHtml(e.item_description)}</td>
+      <td class="nowrap">${escapeHtml(e.time || "")}</td>
+      <td class="old-date">${escapeHtml(e.current_date)}</td>
+      <td class="new-date">${escapeHtml(e.correct_date)}</td>
+    </tr>`).join("");
+  document.getElementById("dateFixCustomerRows").innerHTML = customers.map(c => `
+    <tr>
+      <td><input type="checkbox" class="fix-customer" value="${c.customer_id}"${c.confirmed ? " checked" : ""}></td>
+      <td>${escapeHtml(c.customer_name)}</td>
+      <td class="nowrap">${escapeHtml(c.time_created || "")}</td>
+      <td class="${c.confirmed ? "old-date" : ""}">${escapeHtml(c.current_date)}</td>
+      <td class="${c.confirmed ? "new-date" : ""}">${escapeHtml(c.possible_date)}</td>
+      <td>${escapeHtml(t(c.confirmed ? "date_fix_reason_confirmed" : "date_fix_reason_unsure"))}</td>
+    </tr>`).join("");
+}
+
+async function openDateFixDialog() {
+  await checkShiftedDates();
+  renderDateFixDialog();
+  applyTranslations();
+  dateFixDialog.showModal();
+}
+
+document.getElementById("dateFixAllEntries").onchange = (e) => {
+  document.querySelectorAll(".fix-entry").forEach(cb => { cb.checked = e.target.checked; });
+};
+document.getElementById("dateFixAllCustomers").onchange = (e) => {
+  document.querySelectorAll(".fix-customer").forEach(cb => { cb.checked = e.target.checked; });
+};
+
+document.getElementById("dateFixApply").onclick = async () => {
+  const checkedIds = (cls) => [...document.querySelectorAll(`.${cls}:checked`)].map(cb => Number(cb.value));
+  const entryIds = checkedIds("fix-entry");
+  const customerIds = checkedIds("fix-customer");
+  const n = entryIds.length + customerIds.length;
+  if (n === 0) { alert(t("date_fix_nothing_selected")); return; }
+  if (!confirm(t("date_fix_confirm").replace("{n}", n))) return;
+
+  const result = await api("/maintenance/fix-dates", {
+    method: "POST",
+    body: JSON.stringify({ entry_ids: entryIds, customer_ids: customerIds }),
+  });
+  // Anything left unchecked was looked at and kept on purpose.
+  const fixed = new Set([...entryIds.map(id => `e:${id}`), ...customerIds.map(id => `c:${id}`)]);
+  markReviewed([
+    ...dateFixData.entries.map(e => `e:${e.entry_id}`),
+    ...dateFixData.customers.map(c => `c:${c.customer_id}`),
+  ].filter(k => !fixed.has(k)));
+  dateFixDialog.close();
+  alert(t("date_fix_done").replace("{e}", result.entries_fixed).replace("{c}", result.customers_fixed));
+  await checkShiftedDates();
+  if (currentCustomerId && !document.getElementById("cardView").classList.contains("hidden")) {
+    openCard(currentCustomerId, currentPage, currentSort);
+  } else {
+    loadCustomerList();
+  }
+};
+
+document.getElementById("dateFixCancel").onclick = () => dateFixDialog.close();
+document.getElementById("dateFixReviewBtn").onclick = openDateFixDialog;
+document.getElementById("dateFixDismissBtn").onclick = () => {
+  markReviewed(dateFixNoticeKeys());
+  document.getElementById("dateFixBanner").classList.add("hidden");
+};
+document.getElementById("checkDatesBtn").onclick = () => {
+  backupsDialog.close();
+  openDateFixDialog();
+};
 
 // ===================== Init =====================
 applyTranslations();
 loadCustomerList();
+checkShiftedDates();
 </script>
 </body>
 </html>

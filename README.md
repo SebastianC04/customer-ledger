@@ -19,17 +19,20 @@ leaves the computer.
 - **Running balance** computed on the server: a new entry's balance is the previous
   balance plus deposit minus withdrawal. Editing or deleting an old entry
   deliberately doesn't rewrite other balances.
-- **Search** by name or phone number: partial, case-insensitive, and punctuation in
-  phone numbers is ignored.
+- **Live search** by name or phone number that filters as you type: partial,
+  case-insensitive, and punctuation in phone numbers is ignored.
 - **Input normalization:** phones become `(xxx)-xxx-xxxx`, dates `mm/dd/yyyy`, times
   `h:mm AM/PM`; invalid input is rejected instead of silently mangled.
 - **Pagination** (35 items per card by default, set `ENTRIES_PER_PAGE` in `backend/main.py`).
-- **Activity history** across one customer or the whole database, with date presets
-  (today, week, month, year) and deposit totals for the range.
+- **Starting balance** for cards carried over from the old paper system.
+- **Activity history** with filters that combine: date presets or a range, time of day,
+  type-to-search customer, and item description. Shows totals for the match plus a
+  "Totals by item" breakdown.
 - **English and Spanish UI**, with a per-customer language override.
-- **Automatic backups** on launch and every 30 minutes (last 20 kept), a "Backup Now"
-  button, and a Manage Backups panel to restore. Restoring takes a safety backup of
-  the current data first, so it is itself undoable.
+- **Automatic backups** every hour from 10:30 AM to 7:00 PM while the app is open (only
+  when data changed). Each finished day is combined into one backup unless a restore
+  happened that day; 30 days are kept. Manage Backups has "Backup Now" and restore.
+  Restoring takes a safety backup of the current data first, so it is itself undoable.
 
 ## Stack
 

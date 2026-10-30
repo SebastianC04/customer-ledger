@@ -1,5 +1,5 @@
 import re
-from datetime import datetime
+from datetime import datetime, time as dtime
 from pydantic import BaseModel, field_validator
 from typing import Optional, List, Literal
 
@@ -54,6 +54,18 @@ def normalize_time(raw: str) -> str:
         except ValueError:
             continue
     raise ValueError(f"Unrecognized time '{raw}' — use h:mm AM/PM (or 24-hour HH:MM).")
+
+
+def parse_time(raw: str) -> dtime:
+    """Parses a time string ('12:23 PM', '14:30', ...) into a time object,
+    for time-of-day range filtering in the history view."""
+    raw = raw.strip().upper()
+    for fmt in _TIME_INPUT_FORMATS:
+        try:
+            return datetime.strptime(raw, fmt).time()
+        except ValueError:
+            continue
+    raise ValueError(f"Unrecognized time '{raw}'")
 
 
 def parse_flexible_date(raw: str) -> datetime:
@@ -149,6 +161,11 @@ class EntryOut(BaseModel):
         from_attributes = True
 
 
+class DateFixRequest(BaseModel):
+    entry_ids: List[int] = []
+    customer_ids: List[int] = []
+
+
 # ---------- Customer schemas ----------
 
 class CustomerBase(BaseModel):
@@ -158,6 +175,12 @@ class CustomerBase(BaseModel):
     date_created: str
     time_created: Optional[str] = None  # auto-stamped at creation if not given — see main.py
     language: Optional[LanguageCode] = None  # per-customer override; None = use the app's global default
+    opening_balance: Optional[float] = 0.0  # balance carried over from the old system
+
+    @field_validator("opening_balance", mode="before")
+    @classmethod
+    def _default_blank_opening(cls, v):
+        return _blank_to_zero(v)
 
     @field_validator("phone_number")
     @classmethod
@@ -188,6 +211,14 @@ class CustomerUpdate(BaseModel):
     date_created: Optional[str] = None
     time_created: Optional[str] = None
     language: Optional[LanguageCode] = None
+    opening_balance: Optional[float] = None
+
+    @field_validator("opening_balance", mode="before")
+    @classmethod
+    def _default_blank_opening(cls, v):
+        if isinstance(v, str) and v.strip() == "":
+            return 0.0
+        return v
 
     @field_validator("phone_number")
     @classmethod
