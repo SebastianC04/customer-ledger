@@ -84,6 +84,10 @@ def restore_backup(filename: str):
         raise HTTPException(status_code=404, detail="Backup not found")
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid backup filename")
+    # A backup from an older version may lack newer tables/columns; bring the
+    # restored file up to date right away instead of waiting for a restart.
+    Base.metadata.create_all(bind=engine)
+    run_migrations()
     return {"restored_from": filename, "safety_backup": safety_backup}
 
 
@@ -113,12 +117,13 @@ def recalculate_balances(customer_id: int, db: Session):
     entries = (
         db.query(models.Entry)
         .filter(models.Entry.customer_id == customer_id)
-        .order_by(models.Entry.sort_order)
+        .order_by(models.Entry.sort_order, models.Entry.id)
         .all()
     )
     running = (customer.opening_balance or 0.0) if customer else 0.0
     for e in entries:
-        running += (e.deposit or 0.0) - (e.withdrawal or 0.0)
+        # Round each step to cents so float drift (0.1 + 0.2) never builds up.
+        running = round(running + (e.deposit or 0.0) - (e.withdrawal or 0.0), 2)
         e.total_balance = running
     db.commit()
 
@@ -193,18 +198,20 @@ def get_customer(
     total_pages = max(1, (total_entries + ENTRIES_PER_PAGE - 1) // ENTRIES_PER_PAGE)
     page = min(page, total_pages)
 
+    # Each sort ends with a fixed tie-breaker so equal values never shuffle
+    # between pages.
     order_map = {
-        "added": models.Entry.sort_order.asc(),
-        "recent": models.Entry.sort_order.desc(),
-        "deposit": models.Entry.deposit.desc(),
-        "balance": models.Entry.total_balance.desc(),
+        "added": (models.Entry.sort_order.asc(), models.Entry.id.asc()),
+        "recent": (models.Entry.sort_order.desc(), models.Entry.id.desc()),
+        "deposit": (models.Entry.deposit.desc(), models.Entry.sort_order.asc(), models.Entry.id.asc()),
+        "balance": (models.Entry.total_balance.desc(), models.Entry.sort_order.asc(), models.Entry.id.asc()),
     }
-    order_clause = order_map.get(sort, models.Entry.sort_order.asc())
+    order_clause = order_map.get(sort, order_map["added"])
 
     entries = (
         db.query(models.Entry)
         .filter(models.Entry.customer_id == customer_id)
-        .order_by(order_clause)
+        .order_by(*order_clause)
         .offset((page - 1) * ENTRIES_PER_PAGE)
         .limit(ENTRIES_PER_PAGE)
         .all()
@@ -270,25 +277,31 @@ def add_entry(customer_id: int, entry: schemas.EntryCreate, db: Session = Depend
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")
 
-    max_order = (
-        db.query(func.max(models.Entry.sort_order))
-        .filter(models.Entry.customer_id == customer_id)
-        .scalar()
-    )
-    next_order = (max_order or 0) + 1
+    # One add at a time: two requests arriving together (a double-click)
+    # would otherwise both read the same max sort_order and collide.
+    with _add_entry_lock:
+        max_order = (
+            db.query(func.max(models.Entry.sort_order))
+            .filter(models.Entry.customer_id == customer_id)
+            .scalar()
+        )
+        next_order = (max_order or 0) + 1
 
-    formatted_time = datetime.now().strftime("%I:%M %p")
-    formatted_time = formatted_time.lstrip("0") if formatted_time[0] == "0" else formatted_time
+        formatted_time = datetime.now().strftime("%I:%M %p")
+        formatted_time = formatted_time.lstrip("0") if formatted_time[0] == "0" else formatted_time
 
-    db_entry = models.Entry(
-        customer_id=customer_id, sort_order=next_order, time=formatted_time,
-        **entry.model_dump()
-    )
-    db.add(db_entry)
-    db.commit()
-    recalculate_balances(customer_id, db)
+        db_entry = models.Entry(
+            customer_id=customer_id, sort_order=next_order, time=formatted_time,
+            **entry.model_dump()
+        )
+        db.add(db_entry)
+        db.commit()
+        recalculate_balances(customer_id, db)
     db.refresh(db_entry)
     return db_entry
+
+
+_add_entry_lock = threading.Lock()
 
 
 @app.put("/api/entries/{entry_id}", response_model=schemas.EntryOut)
@@ -451,15 +464,17 @@ def get_history(
 
     items = sorted(by_item.values(), key=lambda g: g["item_description"].casefold())
     for g in items:
-        g["net"] = g["total_deposit"] - g["total_withdrawal"]
+        g["total_deposit"] = round(g["total_deposit"], 2)
+        g["total_withdrawal"] = round(g["total_withdrawal"], 2)
+        g["net"] = round(g["total_deposit"] - g["total_withdrawal"], 2)
 
     return {
         "start": start_dt.strftime("%m/%d/%Y"),
         "end": end_dt.strftime("%m/%d/%Y"),
         "count": len(results),
-        "total_deposit": total_deposit,
-        "total_withdrawal": total_withdrawal,
-        "net": total_deposit - total_withdrawal,
+        "total_deposit": round(total_deposit, 2),
+        "total_withdrawal": round(total_withdrawal, 2),
+        "net": round(total_deposit - total_withdrawal, 2),
         "entries": results,
         "by_item": items,
     }

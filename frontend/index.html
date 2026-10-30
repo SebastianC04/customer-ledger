@@ -386,7 +386,7 @@
     <div class="card">
       <div class="card-header">
         <select id="cardLangSelect" class="card-lang-toggle secondary">
-          <option value="">App default</option>
+          <option value="" data-i18n="app_default">App default</option>
           <option value="en">English</option>
           <option value="es">Español</option>
         </select>
@@ -714,6 +714,15 @@ const TRANSLATIONS = {
     date_fix_confirm: "Change the date on {n} item(s)/card(s)? A backup is taken first, so this can be undone from Manage Backups.",
     date_fix_done: "Fixed {e} item(s) and {c} card(s). A backup from just before the fix is in Manage Backups.",
     date_fix_nothing_selected: "Nothing is selected.",
+    invalid_amount: "That amount isn't a number. Type it like 50 or 1250.00 (a $ sign and commas are fine).",
+    required_fields: "Name, phone number, and date created are required.",
+    restore_confirm: "Restore this backup? This replaces your current data with this backup's data.\n\nA safety backup of what you have right now will be taken first, so this can be undone.",
+    restore_done: "Restore complete.",
+    delete_backup_confirm: "Delete this backup? This cannot be undone.",
+    delete_item_confirm: "Delete this item?",
+    error_prefix: "Error: ",
+    card_page_of: "Page {p} of {n} ({count} items)",
+    app_default: "App default",
     delete_customer: "Delete customer",
     delete_customer_confirm: "Delete {name} and all {n} item(s) on their card?\n\nA backup is taken first, so this can be undone from Manage Backups (look for \"Before delete\").",
     customer_deleted: "Customer deleted. A backup from just before is in Manage Backups.",
@@ -780,6 +789,15 @@ const TRANSLATIONS = {
     date_fix_confirm: "¿Cambiar la fecha de {n} artículo(s)/tarjeta(s)? Primero se hace un respaldo, así que se puede deshacer desde Administrar Respaldos.",
     date_fix_done: "Se corrigieron {e} artículo(s) y {c} tarjeta(s). En Administrar Respaldos hay un respaldo de justo antes de la corrección.",
     date_fix_nothing_selected: "No hay nada marcado.",
+    invalid_amount: "Esa cantidad no es un número. Escríbala como 50 o 1250.00 (puede usar $ y comas).",
+    required_fields: "El nombre, el teléfono y la fecha de creación son obligatorios.",
+    restore_confirm: "¿Restaurar este respaldo? Esto reemplaza sus datos actuales con los del respaldo.\n\nPrimero se guarda un respaldo de seguridad de lo que tiene ahora, así que se puede deshacer.",
+    restore_done: "Restauración completa.",
+    delete_backup_confirm: "¿Eliminar este respaldo? No se puede deshacer.",
+    delete_item_confirm: "¿Eliminar este artículo?",
+    error_prefix: "Error: ",
+    card_page_of: "Página {p} de {n} ({count} artículos)",
+    app_default: "Predeterminado",
     delete_customer: "Eliminar cliente",
     delete_customer_confirm: "¿Eliminar a {name} y sus {n} artículo(s)?\n\nPrimero se hace un respaldo, así que se puede deshacer desde Administrar Respaldos (busque \"Antes de eliminar\").",
     customer_deleted: "Cliente eliminado. En Administrar Respaldos hay un respaldo de justo antes.",
@@ -840,6 +858,26 @@ function fmtDollars(v) {
   return (n < 0 ? "-$" : "$") + fmtMoney(Math.abs(n));
 }
 
+// Reads money the way people type it: "$1,250.50", " 50 ", "" (= 0).
+// Returns null when it isn't a usable amount, so nothing is saved as 0 by mistake.
+function parseMoneyInput(text) {
+  const s = String(text ?? "").replace(/[$,\s]/g, "");
+  if (s === "") return 0;
+  if (!/^-?(\d+\.?\d*|\.\d+)$/.test(s)) return null;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
+}
+
+// Turns a server error into readable text. Validation errors come back as a
+// list ({msg: "Value error, Name can't be empty."}, ...), not a string.
+function errorText(err, fallback) {
+  const d = err && err.detail;
+  if (Array.isArray(d)) {
+    return d.map(x => String((x && x.msg) || "").replace(/^Value error, /, "")).join("\n");
+  }
+  return (typeof d === "string" && d) || fallback;
+}
+
 async function api(path, options = {}) {
   const res = await fetch(API + path, {
     headers: { "Content-Type": "application/json" },
@@ -847,11 +885,29 @@ async function api(path, options = {}) {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
-    alert("Error: " + (err.detail || res.statusText));
-    throw new Error(err.detail || res.statusText);
+    const msg = errorText(err, res.statusText);
+    alert(t("error_prefix") + msg);
+    throw new Error(msg);
   }
   if (res.status === 204) return null;
   return res.json();
+}
+
+// Runs a save/delete action with its button disabled, so a double-click
+// (or a second Enter press) can't send it twice.
+async function whileBusy(button, action) {
+  if (button.disabled) return;
+  button.disabled = true;
+  try {
+    return await action();
+  } finally {
+    button.disabled = false;
+  }
+}
+
+// Lowercase and drop accents, so "jose" finds "José" and "gonzalez" finds "González".
+function foldText(s) {
+  return (s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 }
 
 // Today's date (or any Date) as yyyy-mm-dd in the computer's LOCAL time.
@@ -865,11 +921,6 @@ function localIsoDate(d = new Date()) {
 // Shared customer matcher for the main search and the History customer
 // picker. Every word typed must match the name, or (for digits) the phone,
 // so "john to" finds "John Torres" and "959 55" finds "(510)-959-5506".
-// Lowercase and drop accents, so "jose" finds "José" and "gonzalez" finds "González".
-function foldText(s) {
-  return (s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
-}
-
 function customerMatches(c, query) {
   query = foldText(query.trim());
   if (!query) return true;
@@ -970,7 +1021,7 @@ async function openCard(customerId, page = 1, sort = null) {
   currentCardInfo = { name: data.name, total_entries: data.total_entries };
 
   document.getElementById("pageLabel").textContent =
-    `Page ${data.page} of ${data.total_pages} (${data.total_entries} items)`;
+    t("card_page_of").replace("{p}", data.page).replace("{n}", data.total_pages).replace("{count}", data.total_entries);
   document.getElementById("sortSelect").value = currentSort;
 
   const tbody = document.getElementById("entryRows");
@@ -1043,25 +1094,35 @@ function buildEntryRow(e) {
   let descSelect = null;
   let descCustom = null;
 
+  let saving = false;  // Enter + click (or two clicks) must not save twice
   function saveRow() {
+    if (saving) return;
     const update = {};
-    textEditableCells.forEach(c => {
+    for (const c of textEditableCells) {
       const field = c.dataset.field;
       let val = c.textContent.trim();
       if (["deposit", "withdrawal"].includes(field)) {
-        val = parseFloat(val) || 0;
+        val = parseMoneyInput(val);
+        if (val === null) {
+          alert(t("invalid_amount"));
+          c.focus();
+          return;  // stay in edit mode so it can be corrected
+        }
       }
       update[field] = val;
-    });
+    }
     if (descSelect) {
       update.item_description = descSelect.value === "__other__"
         ? (descCustom.value || "").trim()
         : descSelect.value;
     }
+    saving = true;
     api(`/entries/${tr.dataset.entryId}`, { method: "PUT", body: JSON.stringify(update) })
       .then(() => {
         openCard(currentCustomerId, currentPage, currentSort);
-      });
+      })
+      .catch(() => { /* error already shown; stay in edit mode to fix it */ })
+      .finally(() => { saving = false; });
   }
 
   function handleEnter(ev) {
@@ -1114,12 +1175,12 @@ function buildEntryRow(e) {
     }
   };
 
-  deleteBtn.onclick = async () => {
-    if (confirm("Delete this item?")) {
+  deleteBtn.onclick = () => whileBusy(deleteBtn, async () => {
+    if (confirm(t("delete_item_confirm"))) {
       await api(`/entries/${tr.dataset.entryId}`, { method: "DELETE" });
       openCard(currentCustomerId, currentPage, currentSort);
     }
-  };
+  }).catch(() => {});
 
   return tr;
 }
@@ -1154,7 +1215,7 @@ document.querySelectorAll("#cardView .card-header .editable").forEach(el => {
       // balances; it takes effect the next time an item is added.
       value = value.replace(/[$,\s]/g, "");
       if (value !== "" && isNaN(Number(value))) {
-        alert("Starting balance must be a number.");
+        alert(t("invalid_amount"));
         openCard(currentCustomerId, currentPage, currentSort);
         return;
       }
@@ -1191,7 +1252,7 @@ document.getElementById("backBtn").onclick = () => {
 // Deleting removes the card and every item on it. The server takes a
 // backup first ("Before delete" in Manage Backups), so it can be undone.
 let currentCardInfo = null;  // {name, total_entries} of the open card
-document.getElementById("deleteCustomerBtn").onclick = async () => {
+document.getElementById("deleteCustomerBtn").onclick = (ev) => whileBusy(ev.currentTarget, async () => {
   if (!currentCustomerId || !currentCardInfo) return;
   const msg = t("delete_customer_confirm")
     .replace("{name}", currentCardInfo.name)
@@ -1204,7 +1265,7 @@ document.getElementById("deleteCustomerBtn").onclick = async () => {
   document.getElementById("backBtn").click();
   checkShiftedDates();
   alert(doneMsg);
-};
+}).catch(() => {});
 
 document.getElementById("prevPageBtn").onclick = () => {
   if (currentPage > 1) openCard(currentCustomerId, currentPage - 1, currentSort);
@@ -1240,22 +1301,27 @@ document.getElementById("newCustomerBtn").onclick = () => {
   newCustomerDialog.showModal();
 };
 document.getElementById("nc-cancel").onclick = () => newCustomerDialog.close();
-document.getElementById("nc-save").onclick = async () => {
+document.getElementById("nc-save").onclick = (ev) => whileBusy(ev.currentTarget, async () => {
+  const opening = readAmountBox(document.getElementById("nc-opening"));
+  if (opening === null) {
+    alert(t("invalid_amount"));
+    return;
+  }
   const payload = {
     name: document.getElementById("nc-name").value.trim(),
     phone_number: document.getElementById("nc-phone").value.trim(),
     address: document.getElementById("nc-address").value.trim(),
     date_created: document.getElementById("nc-date").value,
-    opening_balance: parseFloat(document.getElementById("nc-opening").value) || 0,
+    opening_balance: opening,
   };
   if (!payload.name || !payload.phone_number || !payload.date_created) {
-    alert("Name, phone number, and date created are required.");
+    alert(t("required_fields"));
     return;
   }
   const customer = await api("/customers", { method: "POST", body: JSON.stringify(payload) });
   newCustomerDialog.close();
   openCard(customer.id);
-};
+}).catch(() => { /* error already shown; dialog stays open to fix it */ });
 
 // ===================== New entry dialog =====================
 const newEntryDialog = document.getElementById("newEntryDialog");
@@ -1283,20 +1349,34 @@ document.getElementById("addEntryBtn").onclick = () => {
   neDescSelect.focus();
 };
 document.getElementById("ne-cancel").onclick = () => newEntryDialog.close();
-document.getElementById("ne-save").onclick = async () => {
+// Number boxes: some browsers blank the value when the text isn't a plain
+// number (e.g. "1,250" in Firefox) instead of rejecting it, which would
+// quietly save 0. badInput catches that.
+function readAmountBox(el) {
+  if (el.validity && el.validity.badInput) return null;
+  return parseMoneyInput(el.value);
+}
+
+document.getElementById("ne-save").onclick = (ev) => whileBusy(ev.currentTarget, async () => {
   const description = neDescSelect.value === "__other__"
     ? neDescCustom.value.trim()
     : neDescSelect.value;
+  const deposit = readAmountBox(document.getElementById("ne-deposit"));
+  const withdrawal = readAmountBox(document.getElementById("ne-withdrawal"));
+  if (deposit === null || withdrawal === null) {
+    alert(t("invalid_amount"));
+    return;
+  }
   const payload = {
     date: document.getElementById("ne-date").value,
     item_description: description,
-    deposit: parseFloat(document.getElementById("ne-deposit").value) || 0,
-    withdrawal: parseFloat(document.getElementById("ne-withdrawal").value) || 0,
+    deposit,
+    withdrawal,
   };
   await api(`/customers/${currentCustomerId}/entries`, { method: "POST", body: JSON.stringify(payload) });
   newEntryDialog.close();
   openCard(currentCustomerId, currentPage, currentSort);
-};
+}).catch(() => { /* error already shown; dialog stays open to fix it */ });
 
 // ===================== Manage backups =====================
 const backupsDialog = document.getElementById("backupsDialog");
@@ -1340,26 +1420,27 @@ async function loadBackupsList() {
         <button class="danger delete-backup-btn" data-i18n="delete">Delete</button>
       </div>
     `;
-    row.querySelector(".restore-btn").onclick = async () => {
-      const ok = confirm(
-        "Restore this backup? This replaces your current data with this backup's data.\n\n" +
-        "A safety backup of what you have right now will be taken first, so this can be undone."
-      );
-      if (!ok) return;
+    row.querySelector(".restore-btn").onclick = (ev) => whileBusy(ev.currentTarget, async () => {
+      if (!confirm(t("restore_confirm"))) return;
       await api(`/backups/${encodeURIComponent(b.filename)}/restore`, { method: "POST" });
       await loadBackupsList();
-      if (currentCustomerId && !document.getElementById("cardView").classList.contains("hidden")) {
+      const cardOpen = currentCustomerId && !document.getElementById("cardView").classList.contains("hidden");
+      // The open card may not exist in the restored data; fall back to the list.
+      const stillExists = cardOpen && (await refreshCustomers()).some(c => c.id === currentCustomerId);
+      if (stillExists) {
         openCard(currentCustomerId, 1, currentSort);
       } else {
-        loadCustomerList();
+        if (cardOpen) document.getElementById("backBtn").click();
+        else loadCustomerList();
       }
-      alert("Restore complete.");
-    };
-    row.querySelector(".delete-backup-btn").onclick = async () => {
-      if (!confirm("Delete this backup? This cannot be undone.")) return;
+      checkShiftedDates();
+      alert(t("restore_done"));
+    }).catch(() => {});
+    row.querySelector(".delete-backup-btn").onclick = (ev) => whileBusy(ev.currentTarget, async () => {
+      if (!confirm(t("delete_backup_confirm"))) return;
       await api(`/backups/${encodeURIComponent(b.filename)}`, { method: "DELETE" });
       await loadBackupsList();
-    };
+    }).catch(() => {});
     list.appendChild(row);
   }
   applyTranslations();
@@ -1370,11 +1451,11 @@ document.getElementById("manageBackupsBtn").onclick = async () => {
   backupsDialog.showModal();
 };
 document.getElementById("backups-close").onclick = () => backupsDialog.close();
-document.getElementById("backupNowBtn").onclick = async () => {
+document.getElementById("backupNowBtn").onclick = (ev) => whileBusy(ev.currentTarget, async () => {
   await api("/backup", { method: "POST" });
   await loadBackupsList();
   alert(t("backup_done"));
-};
+}).catch(() => {});
 
 // ===================== History =====================
 // Every filter (dates, times, customer, item) applies together, and the
@@ -1877,7 +1958,8 @@ document.getElementById("dateFixAllCustomers").onchange = (e) => {
   document.querySelectorAll(".fix-customer").forEach(cb => { cb.checked = e.target.checked; });
 };
 
-document.getElementById("dateFixApply").onclick = async () => {
+document.getElementById("dateFixApply").onclick = (ev) => whileBusy(ev.currentTarget, applyDateFix).catch(() => {});
+async function applyDateFix() {
   const checkedIds = (cls) => [...document.querySelectorAll(`.${cls}:checked`)].map(cb => Number(cb.value));
   const entryIds = checkedIds("fix-entry");
   const customerIds = checkedIds("fix-customer");
@@ -1903,7 +1985,7 @@ document.getElementById("dateFixApply").onclick = async () => {
   } else {
     loadCustomerList();
   }
-};
+}
 
 document.getElementById("dateFixCancel").onclick = () => dateFixDialog.close();
 document.getElementById("dateFixReviewBtn").onclick = openDateFixDialog;
