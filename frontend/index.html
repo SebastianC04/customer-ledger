@@ -18,6 +18,23 @@
   body, button, input, select, textarea, dialog {
     font-family: 'Georgia', 'Times New Roman', serif;
   }
+  /* Georgia's digits are "old-style" by default (3, 4, 5, 7, 9 drop below the
+     line). Form controls and their inner parts don't inherit the number
+     style from body, so set even-height, same-width digits on everything. */
+  *, *::before, *::after, input::placeholder, option {
+    font-variant-numeric: lining-nums tabular-nums;
+    font-feature-settings: "lnum" 1, "tnum" 1;
+  }
+  /* Separate rule: Firefox drops a whole rule if any selector in it is
+     unknown, and these date/time field parts only exist in Chrome/Edge
+     (which the desktop app uses). */
+  input::-webkit-datetime-edit, input::-webkit-datetime-edit-fields-wrapper,
+  input::-webkit-datetime-edit-month-field, input::-webkit-datetime-edit-day-field,
+  input::-webkit-datetime-edit-year-field, input::-webkit-datetime-edit-hour-field,
+  input::-webkit-datetime-edit-minute-field, input::-webkit-datetime-edit-ampm-field {
+    font-variant-numeric: lining-nums tabular-nums;
+    font-feature-settings: "lnum" 1, "tnum" 1;
+  }
   body {
     margin: 0;
     background: #eae6db;
