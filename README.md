@@ -43,7 +43,7 @@ wrapped by an Inno Setup installer.
 
 ## Run it
 
-Requires Python 3.9+.
+Requires Python 3.10+.
 
 ```
 cd backend
