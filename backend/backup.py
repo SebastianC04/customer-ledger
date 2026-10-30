@@ -9,8 +9,8 @@ Schedule and storage rules:
   if the data changed since the last backup.
 - Once a day is over, its backups collapse into one (the last one of that
   day), unless a restore happened that day. Restores leave a "pre-restore"
-  safety backup behind (so does the date fix), and a day that has one keeps
-  every backup.
+  safety backup behind (so do the date fix and deleting a customer), and a
+  day that has one keeps every backup.
 - Backups older than BACKUP_RETENTION_DAYS are deleted.
 """
 import os
@@ -22,8 +22,9 @@ from database import DB_PATH, get_app_data_dir
 BACKUP_PREFIX = "ledger_backup_"
 PRE_RESTORE_TAG = "_prerestore"
 PRE_DATE_FIX_TAG = "_predatefix"
+PRE_DELETE_TAG = "_predelete"
 # A day holding one of these safety backups keeps all of its backups.
-KEEP_DAY_TAGS = (PRE_RESTORE_TAG, PRE_DATE_FIX_TAG)
+KEEP_DAY_TAGS = (PRE_RESTORE_TAG, PRE_DATE_FIX_TAG, PRE_DELETE_TAG)
 BACKUP_RETENTION_DAYS = 30
 
 BACKUP_WINDOW_START = dtime(10, 30)
@@ -156,6 +157,7 @@ def list_backups() -> list[dict]:
             "created": ts.isoformat(),
             "kind": ("pre_restore" if PRE_RESTORE_TAG in f
                      else "pre_date_fix" if PRE_DATE_FIX_TAG in f
+                     else "pre_delete" if PRE_DELETE_TAG in f
                      else "regular"),
         })
     return result

@@ -245,7 +245,10 @@
     color: #888;
     padding: 40px 0;
   }
-  #backBtn { margin-bottom: 14px; }
+  .card-top-row {
+    display: flex; justify-content: space-between; align-items: center;
+    gap: 10px; flex-wrap: wrap; margin-bottom: 14px;
+  }
 
   .backup-row {
     display: flex;
@@ -376,7 +379,10 @@
   </div>
 
   <div id="cardView" class="hidden">
-    <button class="secondary" id="backBtn" data-i18n="back">&larr; Back to all customers</button>
+    <div class="card-top-row">
+      <button class="secondary" id="backBtn" data-i18n="back">&larr; Back to all customers</button>
+      <button class="danger" id="deleteCustomerBtn" data-i18n="delete_customer">Delete customer</button>
+    </div>
     <div class="card">
       <div class="card-header">
         <select id="cardLangSelect" class="card-lang-toggle secondary">
@@ -708,6 +714,10 @@ const TRANSLATIONS = {
     date_fix_confirm: "Change the date on {n} item(s)/card(s)? A backup is taken first, so this can be undone from Manage Backups.",
     date_fix_done: "Fixed {e} item(s) and {c} card(s). A backup from just before the fix is in Manage Backups.",
     date_fix_nothing_selected: "Nothing is selected.",
+    delete_customer: "Delete customer",
+    delete_customer_confirm: "Delete {name} and all {n} item(s) on their card?\n\nA backup is taken first, so this can be undone from Manage Backups (look for \"Before delete\").",
+    customer_deleted: "Customer deleted. A backup from just before is in Manage Backups.",
+    before_delete: "Before delete",
     date_fix_why: "Why it's listed",
     date_fix_reason_confirmed: "Confirmed: an item was added before this date",
     date_fix_reason_unsure: "Can't tell: check the paper card",
@@ -770,6 +780,10 @@ const TRANSLATIONS = {
     date_fix_confirm: "¿Cambiar la fecha de {n} artículo(s)/tarjeta(s)? Primero se hace un respaldo, así que se puede deshacer desde Administrar Respaldos.",
     date_fix_done: "Se corrigieron {e} artículo(s) y {c} tarjeta(s). En Administrar Respaldos hay un respaldo de justo antes de la corrección.",
     date_fix_nothing_selected: "No hay nada marcado.",
+    delete_customer: "Eliminar cliente",
+    delete_customer_confirm: "¿Eliminar a {name} y sus {n} artículo(s)?\n\nPrimero se hace un respaldo, así que se puede deshacer desde Administrar Respaldos (busque \"Antes de eliminar\").",
+    customer_deleted: "Cliente eliminado. En Administrar Respaldos hay un respaldo de justo antes.",
+    before_delete: "Antes de eliminar",
     date_fix_why: "Por qué aparece",
     date_fix_reason_confirmed: "Confirmado: se agregó un artículo antes de esta fecha",
     date_fix_reason_unsure: "No se sabe: revise la tarjeta de papel",
@@ -953,6 +967,7 @@ async function openCard(customerId, page = 1, sort = null) {
   document.getElementById("fld-address").textContent = data.address || "";
   document.getElementById("fld-date_created").textContent = data.date_created;
   document.getElementById("fld-opening_balance").textContent = fmtMoney(data.opening_balance);
+  currentCardInfo = { name: data.name, total_entries: data.total_entries };
 
   document.getElementById("pageLabel").textContent =
     `Page ${data.page} of ${data.total_pages} (${data.total_entries} items)`;
@@ -1173,6 +1188,24 @@ document.getElementById("backBtn").onclick = () => {
   loadCustomerList();
 };
 
+// Deleting removes the card and every item on it. The server takes a
+// backup first ("Before delete" in Manage Backups), so it can be undone.
+let currentCardInfo = null;  // {name, total_entries} of the open card
+document.getElementById("deleteCustomerBtn").onclick = async () => {
+  if (!currentCustomerId || !currentCardInfo) return;
+  const msg = t("delete_customer_confirm")
+    .replace("{name}", currentCardInfo.name)
+    .replace("{n}", currentCardInfo.total_entries);
+  if (!confirm(msg)) return;
+  const doneMsg = t("customer_deleted");  // in the card's language, before leaving it
+  await api(`/customers/${currentCustomerId}`, { method: "DELETE" });
+  currentCustomerId = null;
+  currentCardInfo = null;
+  document.getElementById("backBtn").click();
+  checkShiftedDates();
+  alert(doneMsg);
+};
+
 document.getElementById("prevPageBtn").onclick = () => {
   if (currentPage > 1) openCard(currentCustomerId, currentPage - 1, currentSort);
 };
@@ -1299,7 +1332,8 @@ async function loadBackupsList() {
         <div class="when">${fmtWhen(b.created)}</div>
         <div class="size">${fmtBytes(b.size_bytes)}${
           b.kind === "pre_restore" ? " · " + escapeHtml(t("before_restore"))
-          : b.kind === "pre_date_fix" ? " · " + escapeHtml(t("before_date_fix")) : ""}</div>
+          : b.kind === "pre_date_fix" ? " · " + escapeHtml(t("before_date_fix"))
+          : b.kind === "pre_delete" ? " · " + escapeHtml(t("before_delete")) : ""}</div>
       </div>
       <div class="backup-actions">
         <button class="secondary restore-btn" data-i18n="restore">Restore</button>

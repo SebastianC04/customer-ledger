@@ -245,12 +245,15 @@ def update_customer(
 
 @app.delete("/api/customers/{customer_id}")
 def delete_customer(customer_id: int, db: Session = Depends(get_db)):
+    """Deletes a customer card and every entry on it. Takes a safety backup
+    first, so a mistaken delete can be undone from Manage Backups."""
     customer = db.query(models.Customer).filter(models.Customer.id == customer_id).first()
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")
+    safety = backup.create_backup(tag=backup.PRE_DELETE_TAG)
     db.delete(customer)
     db.commit()
-    return {"ok": True}
+    return {"ok": True, "backup": os.path.basename(safety) if safety else None}
 
 
 # ---------------------------------------------------------------------------
