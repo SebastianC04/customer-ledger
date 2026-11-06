@@ -85,8 +85,8 @@ frontend/
 ## Packaging for Windows
 
 [USB_INSTALL_GUIDE.md](USB_INSTALL_GUIDE.md) walks through building the installer and
-installing it from a flash drive. The packaging scripts (`build_installer/`) are not
-included in this public repo. The native window needs Microsoft's WebView2 runtime,
+installing it from a flash drive. The packaging scripts (`build_installer/`) are kept
+in a separate private repo. The native window needs Microsoft's WebView2 runtime,
 which ships with current Windows 10 and 11.
 
 ## License

@@ -5,8 +5,10 @@ Two stages: **Stage A** happens on your own machine. **Stage B** happens on-site
 target computer. Updating a computer that already has TARJETAS is covered in Stage B too.
 
 > **Note:** the `build_installer/` scripts mentioned below are not included in this public
-> repo. Keep a copy of `build.bat`, `TARJETAS.spec` and `installer.iss` in a
-> `build_installer/` folder next to `backend/` and `frontend/`.
+> repo. They live in a separate private repo (`customer-ledger-build`), which also keeps
+> each finished installer as a GitHub Release. Clone it into a `build_installer/` folder
+> next to `backend/` and `frontend/`:
+> `git clone https://github.com/SebastianC04/customer-ledger-build.git build_installer`
 
 ---
 

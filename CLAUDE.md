@@ -27,7 +27,7 @@ Search (customer list, History customer picker, History item filter) ignores cas
 
 On this Windows machine `uvicorn --reload` hangs on reload (old process keeps serving), so restart the server manually after backend changes. `index.html` is served with `Cache-Control: no-cache`.
 
-There is no test suite, linter, or formatter configured. Packaging scripts (`build_installer/`, PyInstaller + Inno Setup) are not in this repo; see `USB_INSTALL_GUIDE.md`.
+There is no test suite, linter, or formatter configured. Packaging scripts (`build_installer/`, PyInstaller + Inno Setup) live in a separate private repo, `SebastianC04/customer-ledger-build`, cloned into `build_installer/` (ignored here). Finished installers are attached to that repo's GitHub Releases. See `USB_INSTALL_GUIDE.md`.
 
 ## Architecture
 

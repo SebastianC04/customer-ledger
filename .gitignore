@@ -3,9 +3,8 @@ __pycache__/
 *.pyc
 
 # packaging output — rebuild locally with build_installer/build.bat, don't commit
-build_installer/build/
-build_installer/dist/
-build_installer/Output/
+# The packaging scripts live in their own private repo, cloned into this folder.
+build_installer/
 
 # runtime data — never commit real customer data
 backend/ledger.db
